@@ -1,0 +1,626 @@
+
+
+<!DOCTYPE html>
+<html lang="zh-CN" data-default-color-scheme=&#34;auto&#34;>
+
+
+
+<head>
+  <meta charset="UTF-8">
+  <link rel="apple-touch-icon" sizes="76x76" href="/img/favicon.png">
+  <link rel="icon" type="image/png" href="/img/favicon.png">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  
+  <meta name="theme-color" content="#2f4154">
+  <meta name="description" content="">
+  <meta name="author" content="prexer">
+  <meta name="keywords" content="">
+  <title>文章编写规范 - Prexer&#39;s Blog</title>
+
+  <link  rel="stylesheet" href="https://cdn.staticfile.org/twitter-bootstrap/4.4.1/css/bootstrap.min.css" />
+
+
+  <link  rel="stylesheet" href="https://cdn.staticfile.org/github-markdown-css/4.0.0/github-markdown.min.css" />
+  <link  rel="stylesheet" href="/lib/hint/hint.min.css" />
+
+  
+    
+    
+      
+      <link  rel="stylesheet" href="https://cdn.staticfile.org/highlight.js/10.0.0/styles/gruvbox-dark.min.css" />
+    
+  
+
+  
+
+
+<!-- 主题依赖的图标库，不要自行修改 -->
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1749284_pf9vaxs7x7b.css">
+
+
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1736178_kmeydafke9r.css">
+
+
+<link  rel="stylesheet" href="/css/main.css" />
+
+<!-- 自定义样式保持在最底部 -->
+
+
+  <script  src="/js/utils.js" ></script>
+  <script  src="/js/color-schema.js" ></script>
+<meta name="generator" content="Hexo 5.2.0"></head>
+
+
+<body>
+  <header style="height: 70vh;">
+    <nav id="navbar" class="navbar fixed-top  navbar-expand-lg navbar-dark scrolling-navbar">
+  <div class="container">
+    <a class="navbar-brand"
+       href="/">&nbsp;<strong>妖灵科技</strong>&nbsp;</a>
+
+    <button id="navbar-toggler-btn" class="navbar-toggler" type="button" data-toggle="collapse"
+            data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <div class="animated-icon"><span></span><span></span><span></span></div>
+    </button>
+
+    <!-- Collapsible content -->
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav ml-auto text-center">
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/">
+                <i class="iconfont icon-home-fill"></i>
+                首页
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/archives/">
+                <i class="iconfont icon-archive-fill"></i>
+                归档
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/categories/">
+                <i class="iconfont icon-category-fill"></i>
+                分类
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/tags/">
+                <i class="iconfont icon-tags-fill"></i>
+                标签
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/about/">
+                <i class="iconfont icon-user-fill"></i>
+                关于
+              </a>
+            </li>
+          
+        
+        
+          <li class="nav-item" id="search-btn">
+            <a class="nav-link" data-toggle="modal" data-target="#modalSearch">&nbsp;<i
+                class="iconfont icon-search"></i>&nbsp;</a>
+          </li>
+        
+        
+          <li class="nav-item" id="color-toggle-btn">
+            <a class="nav-link" href="javascript:">&nbsp;<i
+                class="iconfont icon-dark" id="color-toggle-icon"></i>&nbsp;</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+    <div class="banner intro-2" id="background" parallax=true
+         style="background: url('/img/default.png') no-repeat center center;
+           background-size: cover;">
+      <div class="full-bg-img">
+        <div class="mask flex-center" style="background-color: rgba(0, 0, 0, 0.3)">
+          <div class="container page-header text-center fade-in-up">
+            <span class="h2" id="subtitle">
+              
+            </span>
+
+            
+              <div class="mt-3">
+  
+    <span class="post-meta mr-2">
+      <i class="iconfont icon-author" aria-hidden="true"></i>
+      prexer
+    </span>
+  
+  
+    <span class="post-meta">
+      <i class="iconfont icon-date-fill" aria-hidden="true"></i>
+      <time datetime="2020-02-20 20:02" pubdate>
+        2020年2月20日 晚上
+      </time>
+    </span>
+  
+</div>
+
+<div class="mt-1">
+  
+    
+    <span class="post-meta mr-2">
+      <i class="iconfont icon-chart"></i>
+      744 字
+    </span>
+  
+
+  
+    
+    <span class="post-meta mr-2">
+      <i class="iconfont icon-clock-fill"></i>
+      
+      
+      8
+       分钟
+    </span>
+  
+
+  
+  
+    
+      <!-- 不蒜子统计文章PV -->
+      <span id="busuanzi_container_page_pv" style="display: none">
+        <i class="iconfont icon-eye" aria-hidden="true"></i>
+        <span id="busuanzi_value_page_pv"></span> 次
+      </span>
+    
+  
+</div>
+
+            
+          </div>
+
+          
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    
+      
+
+<div class="container-fluid">
+  <div class="row">
+    <div class="d-none d-lg-block col-lg-2"></div>
+    <div class="col-lg-8 nopadding-md">
+      <div class="container nopadding-md" id="board-ctn">
+        <div class="py-5" id="board">
+          <article class="post-content mx-auto" id="post">
+            <!-- SEO header -->
+            <h1 style="display: none">文章编写规范</h1>
+            
+              <p class="note note-info">
+                
+                  本文最后更新于：2020年10月1日 下午
+                
+              </p>
+            
+            <div class="markdown-body" id="post-body">
+              <p>文章开头类似如下的语法：</p>
+<div class="hljs"><pre><code class="hljs yaml"><span class="hljs-meta">---</span>
+<span class="hljs-attr">title:</span> <span class="hljs-string">xxx</span>
+<span class="hljs-attr">date:</span>  <span class="hljs-string">xxx</span>
+<span class="hljs-attr">categories:</span> <span class="hljs-string">xxx</span>
+<span class="hljs-string">tags：</span> <span class="hljs-string">xxx</span>
+<span class="hljs-attr">layout:</span> <span class="hljs-string">xxx</span>
+<span class="hljs-meta">---</span></code></pre></div>
+<p>在Hexo中叫做<code>Front-Matter</code>，通过它你可以限定文章的一些行为。</p>
+<p>所以本文重点说明Hexo的<code>Front-Matter</code>和<code>文章书写格式</code></p>
+<h1 id="Front-Matter中必要的信息"><a href="#Front-Matter中必要的信息" class="headerlink" title="Front-Matter中必要的信息"></a>Front-Matter中必要的信息</h1><h2 id="title"><a href="#title" class="headerlink" title="title"></a>title</h2><p>文章标题，内置中文支持</p>
+<h2 id="date"><a href="#date" class="headerlink" title="date"></a>date</h2><p>文章撰写时间</p>
+<h2 id="categories"><a href="#categories" class="headerlink" title="categories"></a>categories</h2><p>文章归档种类，一般认为，<code>categories</code>用来描述文章作者的知识结构树，文章应该明确属于某一个领域，哪怕它已经借鉴了其他领域的知识。</p>
+<h2 id="tags"><a href="#tags" class="headerlink" title="tags"></a>tags</h2><p>文章的标签，一般认为，<code>tags</code>并不和<code>categories</code>用法一致，它被用来标识文章中具有的知识领域，并用类似网络用语中的<code>关键字</code>来标记出来，构成另一个利于查找的维度。</p>
+<h2 id="layout"><a href="#layout" class="headerlink" title="layout"></a>layout</h2><p>文章的布局，由于撰写文章，它的值有两种：<code>post</code>和<code>false</code>，当不想展示文章时，使用<code>false</code>标注</p>
+<h2 id="banner-img"><a href="#banner-img" class="headerlink" title="banner_img"></a>banner_img</h2><p>当前文章页面顶部大图，可以使用本地图片的相对路径，也可以为外站链接。</p>
+<div class="hljs"><pre><code class="hljs text">站内： banner_img: /img/site-fixed-images/example.jpg   # 对应存放在 /source/img/site-fixed-images/example.jpg
+站外： banner_img: https://static.zkqiang.cn/example.jpg</code></pre></div>
+<p><strong>NOTE</strong>: 图片大小建议压缩到 1MB 以内，否则会严重拖慢页面加载</p>
+<h2 id="文章摘要"><a href="#文章摘要" class="headerlink" title="文章摘要"></a>文章摘要</h2><p>显示在首页中和文章顶部的摘要信息，格式为：</p>
+<div class="hljs"><pre><code class="hljs html">摘要
+<span class="hljs-comment">&lt;!-- more --&gt;</span>
+正文</code></pre></div>
+<p>也可以使用<code>Front-Matter</code>格式：</p>
+<div class="hljs"><pre><code class="hljs yaml"><span class="hljs-meta">---</span>
+<span class="hljs-attr">title:</span> <span class="hljs-string">这是标题</span>
+<span class="hljs-attr">excerpt:</span> <span class="hljs-string">这是摘要</span>
+<span class="hljs-meta">---</span></code></pre></div>
+
+<h2 id="隐藏文章"><a href="#隐藏文章" class="headerlink" title="隐藏文章"></a>隐藏文章</h2><p>可以在site中隐藏文章，但依旧可以使用URL访问，格式如下：</p>
+<div class="hljs"><pre><code class="hljs yaml"><span class="hljs-meta">---</span>
+<span class="hljs-attr">hide:</span> <span class="hljs-literal">true</span>
+<span class="hljs-meta">---</span></code></pre></div>
+
+<h2 id="文章首页缩略图"><a href="#文章首页缩略图" class="headerlink" title="文章首页缩略图"></a>文章首页缩略图</h2><p>使用<code>Front-Matter</code>形式配置，与<code>banner_img</code>配置类似，格式如下：</p>
+<div class="hljs"><pre><code class="hljs yaml"><span class="hljs-attr">index_img:</span> <span class="hljs-string">/img/example.jpg</span></code></pre></div>
+
+<h2 id="文章图片引用"><a href="#文章图片引用" class="headerlink" title="文章图片引用"></a>文章图片引用</h2><p>引用本地和外网资源图片，格式如下：</p>
+<div class="hljs"><pre><code class="hljs text">![](/img/example.jpg)
+![](https://static.zkqiang.cn/example.jpg)</code></pre></div>
+
+
+<h2 id="便签扩展"><a href="#便签扩展" class="headerlink" title="便签扩展"></a>便签扩展</h2><p>可以使用渲染引擎完成便签扩展，基本格式如下：</p>
+<div class="hljs"><pre><code class="hljs text">&#123;% note success %&#125;
+文字 或者 `markdown` 均可
+&#123;% endnote %&#125;</code></pre></div>
+
+<p>颜色样式：<code>primary</code>， <code>secondary</code>， <code>success</code>， <code>danger</code>， <code>warning</code>， <code>info</code>， <code>light</code>。</p>
+<h2 id="组图"><a href="#组图" class="headerlink" title="组图"></a>组图</h2><p>如果想把多张图片按一定布局组合显示，你可以在 markdown 中按如下格式</p>
+<div class="hljs"><pre><code class="hljs text">&#123;% gi total n1-n2-... %&#125;
+  ![](url)
+  ![](url)
+  ![](url)
+  ![](url)
+  ![](url)
+&#123;% endgi %&#125;</code></pre></div>
+<p>total：图片总数量，对应中间包含的图片 url 数量<br>n1-n2-…：每行的图片数量，可以省略，默认单行最多 3 张图，求和必须相等于 total，否则按默认样式</p>
+<p>例如 <code>&amp;#123;% gi 5 3-2 %&amp;#125;</code> ，代表共 5 张图，第一行 3 张图，第二行 2 张图。</p>
+<h2 id="脚注"><a href="#脚注" class="headerlink" title="脚注"></a>脚注</h2><p>添加脚注的正确方法如下：</p>
+<div class="hljs"><pre><code class="hljs python">这是一句话[^<span class="hljs-number">1</span>]
+[^<span class="hljs-number">1</span>]: 这是对应的脚注</code></pre></div>
+
+
+
+<h2 id="其他扩展内容"><a href="#其他扩展内容" class="headerlink" title="其他扩展内容"></a>其他扩展内容</h2><p><code>hexo fluid</code>主题有很多扩展的选项，请参考：<a target="_blank" rel="noopener" href="https://hexo.fluid-dev.com/docs/guide/#%E6%96%87%E7%AB%A0%E9%A1%B5">https://hexo.fluid-dev.com/docs/guide/#%E6%96%87%E7%AB%A0%E9%A1%B5</a></p>
+<h1 id="文章正文的Markdown撰写"><a href="#文章正文的Markdown撰写" class="headerlink" title="文章正文的Markdown撰写"></a>文章正文的Markdown撰写</h1><p>代码段请以<code>\</code>```符号括起来，并在开头标注代码所属语言，可以根据喜好添加缩进，如：</p>
+<div class="hljs"><pre><code class="hljs python">```python
+    <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">func</span>:</span>
+        <span class="hljs-keyword">pass</span>
+\```</code></pre></div>
+
+            </div>
+            <hr>
+            <div>
+              <div class="post-metas mb-3">
+                
+                  <div class="post-meta mr-3">
+                    <i class="iconfont icon-category"></i>
+                    
+                      <a class="hover-with-bg" href="/categories/%E6%96%87%E7%AB%A0%E4%B9%A6%E5%86%99%E8%A7%84%E8%8C%83/">文章书写规范</a>
+                    
+                  </div>
+                
+                
+                  <div class="post-meta">
+                    <i class="iconfont icon-tags"></i>
+                    
+                      <a class="hover-with-bg" href="/tags/%E6%96%87%E7%AB%A0-%E6%A0%BC%E5%BC%8F/">文章 格式</a>
+                    
+                  </div>
+                
+              </div>
+              
+                <p class="note note-warning">本站所有文章除特别声明外，均采用 <a target="_blank" href="https://creativecommons.org/licenses/by-sa/4.0/deed.zh" rel="nofollow noopener noopener">CC BY-SA 4.0 协议</a> ，转载请注明出处！</p>
+              
+              
+                <div class="post-prevnext row">
+                  <article class="post-prev col-6">
+                    
+                    
+                      <a href="/2020/10/01/base/git_speed_up_downloading/">
+                        <i class="iconfont icon-arrowleft"></i>
+                        <span class="hidden-mobile">推荐一个加速git仓库下载的方法</span>
+                        <span class="visible-mobile">上一篇</span>
+                      </a>
+                    
+                  </article>
+                  <article class="post-next col-6">
+                    
+                    
+                  </article>
+                </div>
+              
+            </div>
+
+            
+              <!-- Comments -->
+              <article class="comments" id="comments">
+                
+                
+  <div id="vcomments"></div>
+  <script type="text/javascript">
+    function loadValine() {
+      addScript('https://cdn.staticfile.org/valine/1.4.14/Valine.min.js', function () {
+        new Valine({
+          el: "#vcomments",
+          app_id: "qsamq3Y5DtW17GTEo8fUTR1q-gzGzoHsz",
+          app_key: "U3LxIC5Qmh7XJxc7oi8JWoJ2",
+          placeholder: "请评论和本文有关的技术内容，在发声之前也请你带上你的灵魂...",
+          path: window.location.pathname,
+          avatar: "retro",
+          meta: ["nick","mail","link"],
+          pageSize: "10",
+          lang: "zh-CN",
+          highlight: false,
+          recordIP: true,
+          serverURLs: "https://qsamq3y5.lc-cn-n1-shared.com",
+        });
+      });
+    }
+    waitElementVisible('vcomments', loadValine);
+  </script>
+  <noscript>Please enable JavaScript to view the <a target="_blank" href="https://valine.js.org" rel="nofollow noopener noopener">comments
+      powered by Valine.</a></noscript>
+
+
+              </article>
+            
+          </article>
+        </div>
+      </div>
+    </div>
+    
+      <div class="d-none d-lg-block col-lg-2 toc-container" id="toc-ctn">
+        <div id="toc">
+  <p class="toc-header"><i class="iconfont icon-list"></i>&nbsp;目录</p>
+  <div id="tocbot"></div>
+</div>
+
+      </div>
+    
+  </div>
+</div>
+
+<!-- Custom -->
+
+
+    
+  </main>
+
+  
+    <a id="scroll-top-button" href="#" role="button">
+      <i class="iconfont icon-arrowup" aria-hidden="true"></i>
+    </a>
+  
+
+  
+    <div class="modal fade" id="modalSearch" tabindex="-1" role="dialog" aria-labelledby="ModalLabel"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header text-center">
+        <h4 class="modal-title w-100 font-weight-bold">搜索</h4>
+        <button type="button" id="local-search-close" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body mx-3">
+        <div class="md-form mb-5">
+          <input type="text" id="local-search-input" class="form-control validate">
+          <label data-error="x" data-success="v"
+                 for="local-search-input">关键词</label>
+        </div>
+        <div class="list-group" id="local-search-result"></div>
+      </div>
+    </div>
+  </div>
+</div>
+  
+
+  
+
+  
+
+  <footer class="mt-5">
+  <div class="text-center py-3">
+    <div>
+      <a href="https://hexo.io" target="_blank" rel="nofollow noopener"><span>Hexo</span></a>
+      <i class="iconfont icon-love"></i>
+      <a href="https://github.com/fluid-dev/hexo-theme-fluid" target="_blank" rel="nofollow noopener">
+        <span>Fluid</span></a>
+    </div>
+    
+  <div class="statistics">
+    
+    
+
+    
+      
+        <!-- 不蒜子统计PV -->
+        <span id="busuanzi_container_site_pv" style="display: none">
+            总访问量 
+            <span id="busuanzi_value_site_pv"></span>
+             次
+          </span>
+      
+      
+        <!-- 不蒜子统计UV -->
+        <span id="busuanzi_container_site_uv" style="display: none">
+            总访客数 
+            <span id="busuanzi_value_site_uv"></span>
+             人
+          </span>
+      
+    
+  </div>
+
+
+    
+
+    
+  </div>
+</footer>
+
+<!-- SCRIPTS -->
+<script  src="https://cdn.staticfile.org/jquery/3.4.1/jquery.min.js" ></script>
+<script  src="https://cdn.staticfile.org/twitter-bootstrap/4.4.1/js/bootstrap.min.js" ></script>
+<script  src="/js/debouncer.js" ></script>
+<script  src="/js/main.js" ></script>
+
+<!-- Plugins -->
+
+
+  
+    <script  src="/js/lazyload.js" ></script>
+  
+
+
+
+  
+
+
+
+  <script defer src="https://cdn.staticfile.org/clipboard.js/2.0.6/clipboard.min.js" ></script>
+  <script  src="/js/clipboard-use.js" ></script>
+
+
+
+  <script defer src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" ></script>
+
+
+
+
+
+  <script  src="https://cdn.staticfile.org/tocbot/4.11.1/tocbot.min.js" ></script>
+  <script>
+    $(document).ready(function () {
+      var boardCtn = $('#board-ctn');
+      var boardTop = boardCtn.offset().top;
+
+      tocbot.init({
+        tocSelector: '#tocbot',
+        contentSelector: '#post-body',
+        headingSelector: 'h1,h2,h3,h4,h5,h6',
+        linkClass: 'tocbot-link',
+        activeLinkClass: 'tocbot-active-link',
+        listClass: 'tocbot-list',
+        isCollapsedClass: 'tocbot-is-collapsed',
+        collapsibleClass: 'tocbot-is-collapsible',
+        collapseDepth: 6,
+        scrollSmooth: true,
+        headingsOffset: -boardTop
+      });
+      if ($('.toc-list-item').length > 0) {
+        $('#toc').css('visibility', 'visible');
+      }
+    });
+  </script>
+
+
+
+  <script  src="https://cdn.staticfile.org/typed.js/2.0.11/typed.min.js" ></script>
+  <script>
+    var typed = new Typed('#subtitle', {
+      strings: [
+        '  ',
+        "文章编写规范&nbsp;",
+      ],
+      cursorChar: "_",
+      typeSpeed: 70,
+      loop: false,
+    });
+    typed.stop();
+    $(document).ready(function () {
+      $(".typed-cursor").addClass("h2");
+      typed.start();
+    });
+  </script>
+
+
+
+  <script  src="https://cdn.staticfile.org/anchor-js/4.2.2/anchor.min.js" ></script>
+  <script>
+    anchors.options = {
+      placement: "right",
+      visible: "hover",
+      
+    };
+    var el = "h1,h2,h3,h4,h5,h6".split(",");
+    var res = [];
+    for (item of el) {
+      res.push(".markdown-body > " + item)
+    }
+    anchors.add(res.join(", "))
+  </script>
+
+
+
+  <script  src="/js/local-search.js" ></script>
+  <script>
+    var path = "/local-search.xml";
+    var inputArea = document.querySelector("#local-search-input");
+    inputArea.onclick = function () {
+      searchFunc(path, 'local-search-input', 'local-search-result');
+      this.onclick = null
+    }
+  </script>
+
+
+
+  <script  src="https://cdn.staticfile.org/fancybox/3.5.7/jquery.fancybox.min.js" ></script>
+  <link  rel="stylesheet" href="https://cdn.staticfile.org/fancybox/3.5.7/jquery.fancybox.min.css" />
+
+  <script>
+    $('#post img:not(.no-zoom img, img[no-zoom]), img[zoom]').each(
+      function () {
+        var element = document.createElement('a');
+        $(element).attr('data-fancybox', 'images');
+        $(element).attr('href', $(this).attr('src'));
+        $(this).wrap(element);
+      }
+    );
+  </script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</body>
+</html>

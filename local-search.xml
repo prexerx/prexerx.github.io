@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<search>
+  
+  
+  
+  <entry>
+    <title>推荐一个加速git仓库下载的方法</title>
+    <link href="/2020/10/01/base/git_speed_up_downloading/"/>
+    <url>/2020/10/01/base/git_speed_up_downloading/</url>
+    
+    <content type="html"><![CDATA[<h2 id="引子"><a href="#引子" class="headerlink" title="引子"></a>引子</h2><p>今时已不同往日，网络资源已经逐渐被管控和限制，就当下的形式而言，外网访问的制约，对于一个程序员来说谈不上好事还是坏事。</p><p>不过，如果你在墙内看不到外面的风景，那确实有点可惜，不管是因为墙太高（就像进击的巨人一样）还是其他原因。</p><p>换个法子，将墙外你感兴趣的风景，借助公家条件，移植到墙内来，这样就可以满足你的欲望。</p><p>一样的，github对于国内用户来说已经限速，下载个几十兆的仓库都要好几十分钟，并且有断开的风险，所以请借助gitee达到你的目的吧。</p><h2 id="如何做？"><a href="#如何做？" class="headerlink" title="如何做？"></a>如何做？</h2><p>很简单，利用码云gitee的同步功能，来同步你在github上感兴趣的仓库，然后利用国内极速的网络来完成clone或者下载。</p><h3 id="定位github上的仓库目标"><a href="#定位github上的仓库目标" class="headerlink" title="定位github上的仓库目标"></a>定位github上的仓库目标</h3><p>比如，你在github上看到中了：<a href="https://github.com/hexojs/hexo-starter">https://github.com/hexojs/hexo-starter</a></p><p>那么，请复制这个URL。</p><h3 id="注册并创建gitee仓库"><a href="#注册并创建gitee仓库" class="headerlink" title="注册并创建gitee仓库"></a>注册并创建gitee仓库</h3><p>登录gitee官网：<a href="https://gitee.com/">https://gitee.com/</a></p><p>注册流程交给你自己，就像其他网站注册一样，比较好玩的是国内的gitee可使用手机号绑定并登陆。</p><p>找到并点击<code>新建仓库</code>，然后拖到最后，点击<code>导入仓库</code>，并填写刚才复制的URL地址。</p><p>gitee会自动帮你填充仓库的信息，当然你也可自己修改感兴趣的部分。</p><p>最后点击<code>创建</code>，好了，完成。</p><h3 id="使用gitee"><a href="#使用gitee" class="headerlink" title="使用gitee"></a>使用gitee</h3><p>gitee的用法和github一样，并不特殊，你只需要换一个URL地址。</p><p>从以前的：<br><code>git clone https://github.com/hexojs/hexo-starter.git</code></p><p>到现在的：<br><code>git clone https://gitee.com/prexer/hexo-starter.git</code></p><p>享受极速服务的感觉很不错吧？^_^</p>]]></content>
+    
+    
+    
+  </entry>
+  
+  
+  
+  <entry>
+    <title>文章编写规范</title>
+    <link href="/2020/02/20/articles_writing_rules/"/>
+    <url>/2020/02/20/articles_writing_rules/</url>
+    
+    <content type="html"><![CDATA[<p>文章开头类似如下的语法：</p><pre><code class="hljs yaml"><span class="hljs-meta">---</span><span class="hljs-attr">title:</span> <span class="hljs-string">xxx</span><span class="hljs-attr">date:</span>  <span class="hljs-string">xxx</span><span class="hljs-attr">categories:</span> <span class="hljs-string">xxx</span><span class="hljs-string">tags：</span> <span class="hljs-string">xxx</span><span class="hljs-attr">layout:</span> <span class="hljs-string">xxx</span><span class="hljs-meta">---</span></code></pre><p>在Hexo中叫做<code>Front-Matter</code>，通过它你可以限定文章的一些行为。</p><p>所以本文重点说明Hexo的<code>Front-Matter</code>和<code>文章书写格式</code></p><h1 id="Front-Matter中必要的信息"><a href="#Front-Matter中必要的信息" class="headerlink" title="Front-Matter中必要的信息"></a>Front-Matter中必要的信息</h1><h2 id="title"><a href="#title" class="headerlink" title="title"></a>title</h2><p>文章标题，内置中文支持</p><h2 id="date"><a href="#date" class="headerlink" title="date"></a>date</h2><p>文章撰写时间</p><h2 id="categories"><a href="#categories" class="headerlink" title="categories"></a>categories</h2><p>文章归档种类，一般认为，<code>categories</code>用来描述文章作者的知识结构树，文章应该明确属于某一个领域，哪怕它已经借鉴了其他领域的知识。</p><h2 id="tags"><a href="#tags" class="headerlink" title="tags"></a>tags</h2><p>文章的标签，一般认为，<code>tags</code>并不和<code>categories</code>用法一致，它被用来标识文章中具有的知识领域，并用类似网络用语中的<code>关键字</code>来标记出来，构成另一个利于查找的维度。</p><h2 id="layout"><a href="#layout" class="headerlink" title="layout"></a>layout</h2><p>文章的布局，由于撰写文章，它的值有两种：<code>post</code>和<code>false</code>，当不想展示文章时，使用<code>false</code>标注</p><h2 id="banner-img"><a href="#banner-img" class="headerlink" title="banner_img"></a>banner_img</h2><p>当前文章页面顶部大图，可以使用本地图片的相对路径，也可以为外站链接。</p><pre><code class="hljs text">站内： banner_img: /img/site-fixed-images/example.jpg   # 对应存放在 /source/img/site-fixed-images/example.jpg站外： banner_img: https://static.zkqiang.cn/example.jpg</code></pre><p><strong>NOTE</strong>: 图片大小建议压缩到 1MB 以内，否则会严重拖慢页面加载</p><h2 id="文章摘要"><a href="#文章摘要" class="headerlink" title="文章摘要"></a>文章摘要</h2><p>显示在首页中和文章顶部的摘要信息，格式为：</p><pre><code class="hljs html">摘要<span class="hljs-comment">&lt;!-- more --&gt;</span>正文</code></pre><p>也可以使用<code>Front-Matter</code>格式：</p><pre><code class="hljs yaml"><span class="hljs-meta">---</span><span class="hljs-attr">title:</span> <span class="hljs-string">这是标题</span><span class="hljs-attr">excerpt:</span> <span class="hljs-string">这是摘要</span><span class="hljs-meta">---</span></code></pre><h2 id="隐藏文章"><a href="#隐藏文章" class="headerlink" title="隐藏文章"></a>隐藏文章</h2><p>可以在site中隐藏文章，但依旧可以使用URL访问，格式如下：</p><pre><code class="hljs yaml"><span class="hljs-meta">---</span><span class="hljs-attr">hide:</span> <span class="hljs-literal">true</span><span class="hljs-meta">---</span></code></pre><h2 id="文章首页缩略图"><a href="#文章首页缩略图" class="headerlink" title="文章首页缩略图"></a>文章首页缩略图</h2><p>使用<code>Front-Matter</code>形式配置，与<code>banner_img</code>配置类似，格式如下：</p><pre><code class="hljs yaml"><span class="hljs-attr">index_img:</span> <span class="hljs-string">/img/example.jpg</span></code></pre><h2 id="文章图片引用"><a href="#文章图片引用" class="headerlink" title="文章图片引用"></a>文章图片引用</h2><p>引用本地和外网资源图片，格式如下：</p><pre><code class="hljs text">![](/img/example.jpg)![](https://static.zkqiang.cn/example.jpg)</code></pre><h2 id="便签扩展"><a href="#便签扩展" class="headerlink" title="便签扩展"></a>便签扩展</h2><p>可以使用渲染引擎完成便签扩展，基本格式如下：</p><pre><code class="hljs text">&#123;% note success %&#125;文字 或者 `markdown` 均可&#123;% endnote %&#125;</code></pre><p>颜色样式：<code>primary</code>， <code>secondary</code>， <code>success</code>， <code>danger</code>， <code>warning</code>， <code>info</code>， <code>light</code>。</p><h2 id="组图"><a href="#组图" class="headerlink" title="组图"></a>组图</h2><p>如果想把多张图片按一定布局组合显示，你可以在 markdown 中按如下格式</p><pre><code class="hljs text">&#123;% gi total n1-n2-... %&#125;  ![](url)  ![](url)  ![](url)  ![](url)  ![](url)&#123;% endgi %&#125;</code></pre><p>total：图片总数量，对应中间包含的图片 url 数量<br>n1-n2-…：每行的图片数量，可以省略，默认单行最多 3 张图，求和必须相等于 total，否则按默认样式</p><p>例如 <code>&amp;#123;% gi 5 3-2 %&amp;#125;</code> ，代表共 5 张图，第一行 3 张图，第二行 2 张图。</p><h2 id="脚注"><a href="#脚注" class="headerlink" title="脚注"></a>脚注</h2><p>添加脚注的正确方法如下：</p><pre><code class="hljs python">这是一句话[^<span class="hljs-number">1</span>][^<span class="hljs-number">1</span>]: 这是对应的脚注</code></pre><h2 id="其他扩展内容"><a href="#其他扩展内容" class="headerlink" title="其他扩展内容"></a>其他扩展内容</h2><p><code>hexo fluid</code>主题有很多扩展的选项，请参考：<a href="https://hexo.fluid-dev.com/docs/guide/#%E6%96%87%E7%AB%A0%E9%A1%B5">https://hexo.fluid-dev.com/docs/guide/#%E6%96%87%E7%AB%A0%E9%A1%B5</a></p><h1 id="文章正文的Markdown撰写"><a href="#文章正文的Markdown撰写" class="headerlink" title="文章正文的Markdown撰写"></a>文章正文的Markdown撰写</h1><p>代码段请以<code>\</code>```符号括起来，并在开头标注代码所属语言，可以根据喜好添加缩进，如：</p><pre><code class="hljs python">```python    <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">func</span>:</span>        <span class="hljs-keyword">pass</span>\```</code></pre>]]></content>
+    
+    
+    <categories>
+      
+      <category>文章书写规范</category>
+      
+    </categories>
+    
+    
+    <tags>
+      
+      <tag>文章 格式</tag>
+      
+    </tags>
+    
+  </entry>
+  
+  
+  
+  
+</search>
