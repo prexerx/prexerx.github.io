@@ -60,7 +60,7 @@
     <nav id="navbar" class="navbar fixed-top  navbar-expand-lg navbar-dark scrolling-navbar">
   <div class="container">
     <a class="navbar-brand"
-       href="/">&nbsp;<strong>妖灵科技</strong>&nbsp;</a>
+       href="/">&nbsp;<strong>妖灵山</strong>&nbsp;</a>
 
     <button id="navbar-toggler-btn" class="navbar-toggler" type="button" data-toggle="collapse"
             data-target="#navbarSupportedContent"
@@ -150,7 +150,7 @@
 </nav>
 
     <div class="banner intro-2" id="background" parallax=true
-         style="background: url('/img/default.png') no-repeat center center;
+         style="background: url('/img/site-fixed-images/dead-cells-01.jpg') no-repeat center center;
            background-size: cover;">
       <div class="full-bg-img">
         <div class="mask flex-center" style="background-color: rgba(0, 0, 0, 0.3)">
@@ -182,7 +182,7 @@
     
     <span class="post-meta mr-2">
       <i class="iconfont icon-chart"></i>
-      744 字
+      741 字
     </span>
   
 
@@ -234,12 +234,18 @@
             
               <p class="note note-info">
                 
-                  本文最后更新于：2020年10月1日 下午
+                  本文最后更新于：2020年10月24日 凌晨
                 
               </p>
             
             <div class="markdown-body" id="post-body">
-              <p>文章开头类似如下的语法：</p>
+              <div class="note note-light">
+            <p>本站文章书写规范参考指南。</p>
+          </div>
+
+<a id="more"></a>
+
+<p>文章开头类似如下的语法：</p>
 <div class="hljs"><pre><code class="hljs yaml"><span class="hljs-meta">---</span>
 <span class="hljs-attr">title:</span> <span class="hljs-string">xxx</span>
 <span class="hljs-attr">date:</span>  <span class="hljs-string">xxx</span>
@@ -295,20 +301,21 @@
   ![](url)
   ![](url)
 &#123;% endgi %&#125;</code></pre></div>
+
 <p>total：图片总数量，对应中间包含的图片 url 数量<br>n1-n2-…：每行的图片数量，可以省略，默认单行最多 3 张图，求和必须相等于 total，否则按默认样式</p>
 <p>例如 <code>&amp;#123;% gi 5 3-2 %&amp;#125;</code> ，代表共 5 张图，第一行 3 张图，第二行 2 张图。</p>
 <h2 id="脚注"><a href="#脚注" class="headerlink" title="脚注"></a>脚注</h2><p>添加脚注的正确方法如下：</p>
 <div class="hljs"><pre><code class="hljs python">这是一句话[^<span class="hljs-number">1</span>]
 [^<span class="hljs-number">1</span>]: 这是对应的脚注</code></pre></div>
 
-
-
-<h2 id="其他扩展内容"><a href="#其他扩展内容" class="headerlink" title="其他扩展内容"></a>其他扩展内容</h2><p><code>hexo fluid</code>主题有很多扩展的选项，请参考：<a target="_blank" rel="noopener" href="https://hexo.fluid-dev.com/docs/guide/#%E6%96%87%E7%AB%A0%E9%A1%B5">https://hexo.fluid-dev.com/docs/guide/#%E6%96%87%E7%AB%A0%E9%A1%B5</a></p>
-<h1 id="文章正文的Markdown撰写"><a href="#文章正文的Markdown撰写" class="headerlink" title="文章正文的Markdown撰写"></a>文章正文的Markdown撰写</h1><p>代码段请以<code>\</code>```符号括起来，并在开头标注代码所属语言，可以根据喜好添加缩进，如：</p>
-<div class="hljs"><pre><code class="hljs python">```python
+<h2 id="代码块"><a href="#代码块" class="headerlink" title="代码块"></a>代码块</h2><p>代码段请以<span style='color:red'>```</span>符号括起来，并在开头标注代码所属语言，可以根据喜好添加缩进，如：</p>
+<div class="hljs"><pre><code class="hljs python"><span class="hljs-comment"># 类似这样</span>
+```python
     <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">func</span>:</span>
         <span class="hljs-keyword">pass</span>
-\```</code></pre></div>
+```</code></pre></div>
+
+<h2 id="其他扩展内容"><a href="#其他扩展内容" class="headerlink" title="其他扩展内容"></a>其他扩展内容</h2><p><code>hexo fluid</code>主题有很多扩展的选项，请参考<a target="_blank" rel="noopener" href="https://hexo.fluid-dev.com/docs/guide/#%E6%96%87%E7%AB%A0%E9%A1%B5">这里</a></p>
 
             </div>
             <hr>
@@ -326,7 +333,7 @@
                   <div class="post-meta">
                     <i class="iconfont icon-tags"></i>
                     
-                      <a class="hover-with-bg" href="/tags/%E6%96%87%E7%AB%A0-%E6%A0%BC%E5%BC%8F/">文章 格式</a>
+                      <a class="hover-with-bg" href="/tags/%E6%96%87%E7%AB%A0-%E6%A0%BC%E5%BC%8F-%E4%B9%A6%E5%86%99%E8%A7%84%E8%8C%83/">文章 格式 书写规范</a>
                     
                   </div>
                 
@@ -339,7 +346,7 @@
                   <article class="post-prev col-6">
                     
                     
-                      <a href="/2020/10/01/base/git_speed_up_downloading/">
+                      <a href="/2020/10/24/base/git_speed_up_downloading/">
                         <i class="iconfont icon-arrowleft"></i>
                         <span class="hidden-mobile">推荐一个加速git仓库下载的方法</span>
                         <span class="visible-mobile">上一篇</span>
