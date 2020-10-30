@@ -1,0 +1,711 @@
+
+
+<!DOCTYPE html>
+<html lang="zh-CN" data-default-color-scheme=&#34;auto&#34;>
+
+
+
+<head>
+  <meta charset="UTF-8">
+  <link rel="apple-touch-icon" sizes="76x76" href="/img/favicon.png">
+  <link rel="icon" type="image/png" href="/img/favicon.png">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  
+  <meta name="theme-color" content="#2f4154">
+  <meta name="description" content="">
+  <meta name="author" content="prexer">
+  <meta name="keywords" content="">
+  <title>在内网快速利用docker搭建DNS服务器 - Prexer&#39;s Blog</title>
+
+  <link  rel="stylesheet" href="https://cdn.staticfile.org/twitter-bootstrap/4.4.1/css/bootstrap.min.css" />
+
+
+  <link  rel="stylesheet" href="https://cdn.staticfile.org/github-markdown-css/4.0.0/github-markdown.min.css" />
+  <link  rel="stylesheet" href="/lib/hint/hint.min.css" />
+
+  
+    
+    
+      
+      <link  rel="stylesheet" href="https://cdn.staticfile.org/highlight.js/10.0.0/styles/gruvbox-dark.min.css" />
+    
+  
+
+  
+
+
+<!-- 主题依赖的图标库，不要自行修改 -->
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1749284_pf9vaxs7x7b.css">
+
+
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1736178_kmeydafke9r.css">
+
+
+<link  rel="stylesheet" href="/css/main.css" />
+
+<!-- 自定义样式保持在最底部 -->
+
+
+  <script  src="/js/utils.js" ></script>
+  <script  src="/js/color-schema.js" ></script>
+<meta name="generator" content="Hexo 5.2.0"></head>
+
+
+<body>
+  <header style="height: 70vh;">
+    <nav id="navbar" class="navbar fixed-top  navbar-expand-lg navbar-dark scrolling-navbar">
+  <div class="container">
+    <a class="navbar-brand"
+       href="/">&nbsp;<strong>妖灵山</strong>&nbsp;</a>
+
+    <button id="navbar-toggler-btn" class="navbar-toggler" type="button" data-toggle="collapse"
+            data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <div class="animated-icon"><span></span><span></span><span></span></div>
+    </button>
+
+    <!-- Collapsible content -->
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav ml-auto text-center">
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/">
+                <i class="iconfont icon-home-fill"></i>
+                首页
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/archives/">
+                <i class="iconfont icon-archive-fill"></i>
+                归档
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/categories/">
+                <i class="iconfont icon-category-fill"></i>
+                分类
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/tags/">
+                <i class="iconfont icon-tags-fill"></i>
+                标签
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/about/">
+                <i class="iconfont icon-user-fill"></i>
+                关于
+              </a>
+            </li>
+          
+        
+        
+          <li class="nav-item" id="search-btn">
+            <a class="nav-link" data-toggle="modal" data-target="#modalSearch">&nbsp;<i
+                class="iconfont icon-search"></i>&nbsp;</a>
+          </li>
+        
+        
+          <li class="nav-item" id="color-toggle-btn">
+            <a class="nav-link" href="javascript:">&nbsp;<i
+                class="iconfont icon-dark" id="color-toggle-icon"></i>&nbsp;</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+    <div class="banner intro-2" id="background" parallax=true
+         style="background: url('/img/site-fixed-images/dead-cells-01.jpg') no-repeat center center;
+           background-size: cover;">
+      <div class="full-bg-img">
+        <div class="mask flex-center" style="background-color: rgba(0, 0, 0, 0.3)">
+          <div class="container page-header text-center fade-in-up">
+            <span class="h2" id="subtitle">
+              
+            </span>
+
+            
+              <div class="mt-3">
+  
+    <span class="post-meta mr-2">
+      <i class="iconfont icon-author" aria-hidden="true"></i>
+      prexer
+    </span>
+  
+  
+    <span class="post-meta">
+      <i class="iconfont icon-date-fill" aria-hidden="true"></i>
+      <time datetime="2020-10-29 07:05" pubdate>
+        2020年10月29日 早上
+      </time>
+    </span>
+  
+</div>
+
+<div class="mt-1">
+  
+    
+    <span class="post-meta mr-2">
+      <i class="iconfont icon-chart"></i>
+      1.9k 字
+    </span>
+  
+
+  
+    
+    <span class="post-meta mr-2">
+      <i class="iconfont icon-clock-fill"></i>
+      
+      
+      25
+       分钟
+    </span>
+  
+
+  
+  
+    
+      <!-- 不蒜子统计文章PV -->
+      <span id="busuanzi_container_page_pv" style="display: none">
+        <i class="iconfont icon-eye" aria-hidden="true"></i>
+        <span id="busuanzi_value_page_pv"></span> 次
+      </span>
+    
+  
+</div>
+
+            
+          </div>
+
+          
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    
+      
+
+<div class="container-fluid">
+  <div class="row">
+    <div class="d-none d-lg-block col-lg-2"></div>
+    <div class="col-lg-8 nopadding-md">
+      <div class="container nopadding-md" id="board-ctn">
+        <div class="py-5" id="board">
+          <article class="post-content mx-auto" id="post">
+            <!-- SEO header -->
+            <h1 style="display: none">在内网快速利用docker搭建DNS服务器</h1>
+            
+              <p class="note note-info">
+                
+                  本文最后更新于：2020年10月30日 凌晨
+                
+              </p>
+            
+            <div class="markdown-body" id="post-body">
+              <div class="note note-light">
+            <p>如果你还犯愁，如何在内网搭建DNS服务器，那么请看看这里吧。</p>
+          </div>
+
+<a id="more"></a>
+
+
+
+<h2 id="当前主机是否已经启用53端口？"><a href="#当前主机是否已经启用53端口？" class="headerlink" title="当前主机是否已经启用53端口？"></a>当前主机是否已经启用53端口？</h2><p>如果你不清楚53端口的功能，请查看下<code>/etc/services</code>文件，它会告诉你答案。</p>
+<p>为了顺利进行下一步，需要确保你的机器上没有开启53端口，也就是说你的主机不是一个DNS Server。</p>
+<p>如何确定呢？当然要使用<code>netstat命令</code>来查看端口，当然配合<code>lsof命令</code>也许会更明确。</p>
+<p>比如笔者本机就是这样的：</p>
+<div class="hljs"><pre><code class="hljs shell">prexer $ netstat -ntulp | grep 53
+(Not all processes could be identified, non-owned process info
+ will not be shown, you would have to be root to see it all.)
+tcp        0      0 127.0.0.53:53           0.0.0.0:*               LISTEN      -
+udp        0      0 127.0.0.53:53           0.0.0.0:*                           -
+udp        0      0 0.0.0.0:5353            0.0.0.0:*                           -
+udp6       0      0 :::5353                 :::*                                -
+
+prexer $ sudo lsof -i:53
+COMMAND   PID            USER   FD   TYPE DEVICE SIZE/OFF NODE NAME
+systemd-r 778 systemd-resolve   12u  IPv4  20918      0t0  UDP localhost:domain
+systemd-r 778 systemd-resolve   13u  IPv4  20919      0t0  TCP localhost:domain (LISTEN)</code></pre></div>
+
+
+
+<p>如果找到了端口占用，只要关闭指定的程序即可，简单来说就是这样：</p>
+<div class="hljs"><pre><code class="hljs livecodeserver">prexer $ sudo systemctl <span class="hljs-built_in">stop</span> systemd-<span class="hljs-built_in">resolve</span>
+<span class="hljs-comment"># 或者</span>
+prexer $ sudo <span class="hljs-built_in">kill</span> your_pid</code></pre></div>
+
+
+
+<h2 id="用什么来构建DNS服务器呢？"><a href="#用什么来构建DNS服务器呢？" class="headerlink" title="用什么来构建DNS服务器呢？"></a>用什么来构建DNS服务器呢？</h2><p>当然是大名鼎鼎的<code>DNSmasq</code>了，如果你不了解，您这边请: <a target="_blank" rel="noopener" href="http://www.thekelleys.org.uk/dnsmasq/doc.html%E3%80%82">http://www.thekelleys.org.uk/dnsmasq/doc.html。</a></p>
+<p>这个项目是有命令行支持的，参考官网也可以很容易构建出来，不过本文打算使用更见到的docker容器来完成这件事。</p>
+<p>说到这里，请注意，本文并没有直接使用官方提供的docker镜像，而是使用了另一个拥有web支持的docker镜像。</p>
+<ul>
+<li><p>官方镜像在<a target="_blank" rel="noopener" href="https://hub.docker.com/r/andyshinn/dnsmasq/">这里</a></p>
+</li>
+<li><p>有web支持的镜像在<a target="_blank" rel="noopener" href="https://github.com/jpillora/docker-dnsmasq">这里</a></p>
+</li>
+</ul>
+<h2 id="构建一个符合你胃口的DNSmasq的配置文件"><a href="#构建一个符合你胃口的DNSmasq的配置文件" class="headerlink" title="构建一个符合你胃口的DNSmasq的配置文件"></a>构建一个符合你胃口的DNSmasq的配置文件</h2><p>对于配置docker镜像而言，配置文件肯定是逃不了的，你可以先看看<a target="_blank" rel="noopener" href="http://oss.segetech.com/intra/srv/dnsmasq.conf">官方的配置文档</a>，了解有什么后，再动手也不迟。</p>
+<p>这里我们介绍一个通用且简单的配置，当你学完后可以自己进行修改，多开心。</p>
+<p>配置文件及解释如下：(将这个文件保存为：dnsmasq.conf文件，存储在你当前的工作目录或者任意可指定的目录即可)</p>
+<div class="hljs"><pre><code class="hljs routeros"><span class="hljs-comment"># filename: dnsmasq.conf</span>
+
+<span class="hljs-comment"># 需要存储log，后续再命令行中指定log的限制大小</span>
+log-queries
+
+<span class="hljs-comment"># 指定一个自定义的解析文件，它可以保证你不用修改原始的配置文件/etc/resolv.conf</span>
+<span class="hljs-attribute">resolv-file</span>=/tmp/resolv.conf
+
+<span class="hljs-comment"># 一个测试的名字，IP地址是内部网络的另一台主机，通过这个名字来完成后续的验证</span>
+<span class="hljs-attribute">address</span>=/hello.remote/10.22.52.229
+
+<span class="hljs-comment"># upstream nameserver，也就是找不到靠上游的道理</span>
+<span class="hljs-comment"># server=/localnet/127.0.0.1 # 不加也可以，添加非公开的内网DNS，就像联机打游戏一样 </span>
+<span class="hljs-attribute">server</span>=10.22.0.1
+<span class="hljs-attribute">server</span>=10.22.0.2</code></pre></div>
+
+<p>复制一份解析文件：</p>
+<div class="hljs"><pre><code class="hljs shell">prexer $ sudo cp /etc/resolv.conf /tmp/resolv.conf</code></pre></div>
+
+<p>到了这里，基本的配置就算完成了，很简单吧，之后我们开始启动DNSmasq容器。</p>
+<h2 id="开始构建激动人心的docker容器"><a href="#开始构建激动人心的docker容器" class="headerlink" title="开始构建激动人心的docker容器"></a>开始构建激动人心的docker容器</h2><p>众所周知，容器的使用廉价的可怜，所以你几乎不用知道细节就可以搭建一个完美的沙盒环境（一点不知道也不行哈…)。按照官方文档的指示，你当然可以修改docker启动的参数，然后鼓捣鼓捣自己的配置，反正玩不坏，尽情尝试。不过为了教学，请看看我的例子：</p>
+<div class="hljs"><pre><code class="hljs shell">docker run -d\
+    --name dnsmasq \
+    --rm \
+    -p 53:53/udp \
+    -p 53:53/tcp \
+    -p 8080:8080 \
+    -v `pwd`/dnsmasq.conf:/etc/dnsmasq.conf \
+    --log-opt &quot;max-size=100m&quot; \
+    -e &quot;HTTP_USER=root&quot; \
+    -e &quot;HTTP_PASS=root&quot; \
+    jpillora/dnsmasq</code></pre></div>
+
+<p>一些简单的参数解释：</p>
+<div class="hljs"><pre><code class="hljs livescript">docker run -d<span class="hljs-string">\</span> <span class="hljs-comment"># 以守护进程的方式运行容器</span>
+    --name dnsmasq <span class="hljs-string">\</span> <span class="hljs-comment"># 容器的名字</span>
+    --rm <span class="hljs-string">\</span> <span class="hljs-comment"># 用完后删除，即你stop的时候就会删除哦</span>
+    -p <span class="hljs-number">53</span>:<span class="hljs-number">53</span>/udp <span class="hljs-string">\</span> <span class="hljs-comment"># 暴露容器的53端口和宿主机关联，udp/tcp协议如果你不懂，简单百科一下</span>
+    -p <span class="hljs-number">53</span>:<span class="hljs-number">53</span>/tcp <span class="hljs-string">\</span>
+    -p <span class="hljs-number">8080</span>:<span class="hljs-number">8080</span> <span class="hljs-string">\</span> <span class="hljs-comment"># 暴露容器的web端口，便于后续再网页上查看和配置</span>
+    -v `pwd`/dnsmasq.conf:/etc/dnsmasq.conf <span class="hljs-string">\</span> <span class="hljs-comment"># 重点，配置文件的关联，这个逻辑卷的知识你可以自行科普</span>
+    --log-opt <span class="hljs-string">&quot;max-size=100m&quot;</span> <span class="hljs-string">\</span> <span class="hljs-comment"># 限制输出的log文件的大小，很简单是吧，呼应前文</span>
+    -e <span class="hljs-string">&quot;HTTP_USER=root&quot;</span> <span class="hljs-string">\</span> <span class="hljs-comment"># 登录web的用户名和密码</span>
+    -e <span class="hljs-string">&quot;HTTP_PASS=root&quot;</span> <span class="hljs-string">\</span>
+    jpillora/dnsmasq <span class="hljs-comment"># 包含web的基础dnsmasq镜像</span></code></pre></div>
+
+
+
+<p>查看启动状态，只是一些基础的docker指令：</p>
+<div class="hljs"><pre><code class="hljs shell"><span class="hljs-meta">#</span><span class="bash"> &gt; docker ps -a |grep dnsmasq <span class="hljs-comment"># 看容器的启动状态</span></span>
+prexer $ docker ps -a|grep dnsmasq
+6d75bfc34244        jpillora/dnsmasq                       &quot;webproc --config /e…&quot;   18 seconds ago      Up 17 seconds       0.0.0.0:53-&gt;53/tcp, 0.0.0.0:8080-&gt;8080/tcp, 0.0.0.0:53-&gt;53/udp   dnsmasq
+
+<span class="hljs-meta">#</span><span class="bash"> &gt; docker logs -f dnsmasq <span class="hljs-comment"># 看容器的标准输出log</span></span>
+prexer $ docker logs -f dnsmasq
+[webproc] 2020/10/30 00:37:30 loaded config files changes from disk
+[webproc] 2020/10/30 00:37:30 agent listening on http://0.0.0.0:8080...
+dnsmasq: started, version 2.80 cachesize 150
+dnsmasq: compile time options: IPv6 GNU-getopt no-DBus no-i18n no-IDN DHCP DHCPv6 no-Lua TFTP no-conntrack ipset auth no-DNSSEC loop-detect inotify dumpfile
+dnsmasq: using nameserver 10.22.0.2#53
+dnsmasq: using nameserver 10.22.0.1#53
+dnsmasq: read /etc/hosts - 7 addresses</code></pre></div>
+
+<p>至于是否启动成功，看看输出结果，对比对比就成了。</p>
+<h2 id="来吧，一起可视化查看与验证"><a href="#来吧，一起可视化查看与验证" class="headerlink" title="来吧，一起可视化查看与验证"></a>来吧，一起可视化查看与验证</h2><p>从浏览器登录你已经配置的主机，方法如下：</p>
+<div class="hljs"><pre><code class="hljs awk">在浏览器中输入：http:<span class="hljs-regexp">//</span>localhost:<span class="hljs-number">8080</span> 或者 http:<span class="hljs-regexp">//</span>remote_ip_address:<span class="hljs-number">8080</span></code></pre></div>
+
+<p>这样就能到达登录界面，用户名和密码是之前命令行参数中配置的，请自行填写，效果如下：</p>
+<p><img src="/img/blog-images/dns_web_show.png" srcset="/img/loading.gif" alt="login web"></p>
+<p>登录后的界面如下：</p>
+<p><img src="/img/blog-images/dns_web_display.png" srcset="/img/loading.gif" alt="display web"></p>
+<p>在验证之前还需要一点知识要梳理：</p>
+<p>首先，之前复制的DNS解析文件<code>/tmp/resolv.conf</code>是配置的DNSmasq解析的上游服务文件，具体请看下面的解释：</p>
+<div class="hljs"><pre><code class="hljs vala"><span class="hljs-meta"># Change this line if you want dns to get its upstream servers from</span>
+<span class="hljs-meta"># somewhere other that /etc/resolv.conf</span>
+<span class="hljs-meta">#resolv-file=</span></code></pre></div>
+
+<p>很多同学在里面配置了<code>nameserver 127.0.0.1</code>本地的地址，想要使用本地的docker DNS服务，其实还不行，需要你真正配置本机的DNS解析文件才可以，也就是修改<code>/etc/resolv.conf</code>添加如下信息：</p>
+<div class="hljs"><pre><code class="hljs angelscript">nameserver <span class="hljs-number">127.0</span><span class="hljs-number">.0</span><span class="hljs-number">.1</span></code></pre></div>
+
+
+
+<p>到这里基本上可以进行下一步了。</p>
+<p>那么我们验证一下配置的结果吧：</p>
+<p>首先用你们最熟悉的<code>ping</code>指令，走个ICMP协议看看：</p>
+<div class="hljs"><pre><code class="hljs routeros">prexer $<span class="hljs-built_in"> ping </span>hello.remote -c 3
+PING hello.remote (10.22.52.229) 56(84) bytes of data.
+64 bytes <span class="hljs-keyword">from</span> CNSHZ-ED-SVR097.sierrawireless.local (10.22.52.229): <span class="hljs-attribute">icmp_seq</span>=1 <span class="hljs-attribute">ttl</span>=64 <span class="hljs-attribute">time</span>=0.190 ms
+64 bytes <span class="hljs-keyword">from</span> CNSHZ-ED-SVR097.sierrawireless.local (10.22.52.229): <span class="hljs-attribute">icmp_seq</span>=2 <span class="hljs-attribute">ttl</span>=64 <span class="hljs-attribute">time</span>=0.257 ms
+64 bytes <span class="hljs-keyword">from</span> CNSHZ-ED-SVR097.sierrawireless.local (10.22.52.229): <span class="hljs-attribute">icmp_seq</span>=3 <span class="hljs-attribute">ttl</span>=64 <span class="hljs-attribute">time</span>=0.230 ms
+
+--- hello.remote<span class="hljs-built_in"> ping </span>statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 1998ms
+rtt min/avg/max/mdev = 0.190/0.225/0.257/0.032 ms</code></pre></div>
+
+
+
+<p>在来看看主机的IP地址映射关系，当然要用<code>host</code>指令：</p>
+<div class="hljs"><pre><code class="hljs routeros">prexer $ host hello.remote
+hello.remote has<span class="hljs-built_in"> address </span>10.22.52.229</code></pre></div>
+
+<p>其他的协议不用一一验证了，应为这是标准的端口，也是通用的tcp/udp协议簇，如果你还好奇，可以验证<code>ssh</code>或者<code>dig</code>之类的指令玩玩。</p>
+<h2 id="内网其他主机如何使用你的DNS服务器？"><a href="#内网其他主机如何使用你的DNS服务器？" class="headerlink" title="内网其他主机如何使用你的DNS服务器？"></a>内网其他主机如何使用你的DNS服务器？</h2><p>本机用当然还不够，要内网其他同事能够使用才行，其实用起来依旧很简单，就是在内网的任意机器上（可达你的主机），修改<code>/etc/resolv.conf</code>文件，添加一行：</p>
+<div class="hljs"><pre><code class="hljs xml">nameserver <span class="hljs-tag">&lt;<span class="hljs-name">your_dns_server_ip_address</span>&gt;</span></code></pre></div>
+
+<p><code>&lt;your_dns_server_ip_address&gt;</code>这个替换你的主机IP就可以了。</p>
+<p>赶快用起来！^_^</p>
+
+            </div>
+            <hr>
+            <div>
+              <div class="post-metas mb-3">
+                
+                  <div class="post-meta mr-3">
+                    <i class="iconfont icon-category"></i>
+                    
+                      <a class="hover-with-bg" href="/categories/docker/">docker</a>
+                    
+                  </div>
+                
+                
+                  <div class="post-meta">
+                    <i class="iconfont icon-tags"></i>
+                    
+                      <a class="hover-with-bg" href="/tags/docker/">docker</a>
+                    
+                      <a class="hover-with-bg" href="/tags/dns/">dns</a>
+                    
+                  </div>
+                
+              </div>
+              
+                <p class="note note-warning">本站所有文章除特别声明外，均采用 <a target="_blank" href="https://creativecommons.org/licenses/by-sa/4.0/deed.zh" rel="nofollow noopener noopener">CC BY-SA 4.0 协议</a> ，转载请注明出处！</p>
+              
+              
+                <div class="post-prevnext row">
+                  <article class="post-prev col-6">
+                    
+                    
+                  </article>
+                  <article class="post-next col-6">
+                    
+                    
+                      <a href="/2020/10/24/base/git_speed_up_downloading/">
+                        <span class="hidden-mobile">推荐一个加速git仓库下载的方法</span>
+                        <span class="visible-mobile">下一篇</span>
+                        <i class="iconfont icon-arrowright"></i>
+                      </a>
+                    
+                  </article>
+                </div>
+              
+            </div>
+
+            
+              <!-- Comments -->
+              <article class="comments" id="comments">
+                
+                
+  <div id="vcomments"></div>
+  <script type="text/javascript">
+    function loadValine() {
+      addScript('https://cdn.staticfile.org/valine/1.4.14/Valine.min.js', function () {
+        new Valine({
+          el: "#vcomments",
+          app_id: "qsamq3Y5DtW17GTEo8fUTR1q-gzGzoHsz",
+          app_key: "U3LxIC5Qmh7XJxc7oi8JWoJ2",
+          placeholder: "请评论和本文有关的技术内容，在发声之前也请你带上你的灵魂...",
+          path: window.location.pathname,
+          avatar: "retro",
+          meta: ["nick","mail","link"],
+          pageSize: "10",
+          lang: "zh-CN",
+          highlight: false,
+          recordIP: true,
+          serverURLs: "https://qsamq3y5.lc-cn-n1-shared.com",
+        });
+      });
+    }
+    waitElementVisible('vcomments', loadValine);
+  </script>
+  <noscript>Please enable JavaScript to view the <a target="_blank" href="https://valine.js.org" rel="nofollow noopener noopener">comments
+      powered by Valine.</a></noscript>
+
+
+              </article>
+            
+          </article>
+        </div>
+      </div>
+    </div>
+    
+      <div class="d-none d-lg-block col-lg-2 toc-container" id="toc-ctn">
+        <div id="toc">
+  <p class="toc-header"><i class="iconfont icon-list"></i>&nbsp;目录</p>
+  <div id="tocbot"></div>
+</div>
+
+      </div>
+    
+  </div>
+</div>
+
+<!-- Custom -->
+
+
+    
+  </main>
+
+  
+    <a id="scroll-top-button" href="#" role="button">
+      <i class="iconfont icon-arrowup" aria-hidden="true"></i>
+    </a>
+  
+
+  
+    <div class="modal fade" id="modalSearch" tabindex="-1" role="dialog" aria-labelledby="ModalLabel"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header text-center">
+        <h4 class="modal-title w-100 font-weight-bold">搜索</h4>
+        <button type="button" id="local-search-close" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body mx-3">
+        <div class="md-form mb-5">
+          <input type="text" id="local-search-input" class="form-control validate">
+          <label data-error="x" data-success="v"
+                 for="local-search-input">关键词</label>
+        </div>
+        <div class="list-group" id="local-search-result"></div>
+      </div>
+    </div>
+  </div>
+</div>
+  
+
+  
+
+  
+
+  <footer class="mt-5">
+  <div class="text-center py-3">
+    <div>
+      <a href="https://hexo.io" target="_blank" rel="nofollow noopener"><span>Hexo</span></a>
+      <i class="iconfont icon-love"></i>
+      <a href="https://github.com/fluid-dev/hexo-theme-fluid" target="_blank" rel="nofollow noopener">
+        <span>Fluid</span></a>
+    </div>
+    
+  <div class="statistics">
+    
+    
+
+    
+      
+        <!-- 不蒜子统计PV -->
+        <span id="busuanzi_container_site_pv" style="display: none">
+            总访问量 
+            <span id="busuanzi_value_site_pv"></span>
+             次
+          </span>
+      
+      
+        <!-- 不蒜子统计UV -->
+        <span id="busuanzi_container_site_uv" style="display: none">
+            总访客数 
+            <span id="busuanzi_value_site_uv"></span>
+             人
+          </span>
+      
+    
+  </div>
+
+
+    
+
+    
+  </div>
+</footer>
+
+<!-- SCRIPTS -->
+<script  src="https://cdn.staticfile.org/jquery/3.4.1/jquery.min.js" ></script>
+<script  src="https://cdn.staticfile.org/twitter-bootstrap/4.4.1/js/bootstrap.min.js" ></script>
+<script  src="/js/debouncer.js" ></script>
+<script  src="/js/main.js" ></script>
+
+<!-- Plugins -->
+
+
+  
+    <script  src="/js/lazyload.js" ></script>
+  
+
+
+
+  
+
+
+
+  <script defer src="https://cdn.staticfile.org/clipboard.js/2.0.6/clipboard.min.js" ></script>
+  <script  src="/js/clipboard-use.js" ></script>
+
+
+
+  <script defer src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" ></script>
+
+
+
+
+
+  <script  src="https://cdn.staticfile.org/tocbot/4.11.1/tocbot.min.js" ></script>
+  <script>
+    $(document).ready(function () {
+      var boardCtn = $('#board-ctn');
+      var boardTop = boardCtn.offset().top;
+
+      tocbot.init({
+        tocSelector: '#tocbot',
+        contentSelector: '#post-body',
+        headingSelector: 'h1,h2,h3,h4,h5,h6',
+        linkClass: 'tocbot-link',
+        activeLinkClass: 'tocbot-active-link',
+        listClass: 'tocbot-list',
+        isCollapsedClass: 'tocbot-is-collapsed',
+        collapsibleClass: 'tocbot-is-collapsible',
+        collapseDepth: 6,
+        scrollSmooth: true,
+        headingsOffset: -boardTop
+      });
+      if ($('.toc-list-item').length > 0) {
+        $('#toc').css('visibility', 'visible');
+      }
+    });
+  </script>
+
+
+
+  <script  src="https://cdn.staticfile.org/typed.js/2.0.11/typed.min.js" ></script>
+  <script>
+    var typed = new Typed('#subtitle', {
+      strings: [
+        '  ',
+        "在内网快速利用docker搭建DNS服务器&nbsp;",
+      ],
+      cursorChar: "_",
+      typeSpeed: 70,
+      loop: false,
+    });
+    typed.stop();
+    $(document).ready(function () {
+      $(".typed-cursor").addClass("h2");
+      typed.start();
+    });
+  </script>
+
+
+
+  <script  src="https://cdn.staticfile.org/anchor-js/4.2.2/anchor.min.js" ></script>
+  <script>
+    anchors.options = {
+      placement: "right",
+      visible: "hover",
+      
+    };
+    var el = "h1,h2,h3,h4,h5,h6".split(",");
+    var res = [];
+    for (item of el) {
+      res.push(".markdown-body > " + item)
+    }
+    anchors.add(res.join(", "))
+  </script>
+
+
+
+  <script  src="/js/local-search.js" ></script>
+  <script>
+    var path = "/local-search.xml";
+    var inputArea = document.querySelector("#local-search-input");
+    inputArea.onclick = function () {
+      searchFunc(path, 'local-search-input', 'local-search-result');
+      this.onclick = null
+    }
+  </script>
+
+
+
+  <script  src="https://cdn.staticfile.org/fancybox/3.5.7/jquery.fancybox.min.js" ></script>
+  <link  rel="stylesheet" href="https://cdn.staticfile.org/fancybox/3.5.7/jquery.fancybox.min.css" />
+
+  <script>
+    $('#post img:not(.no-zoom img, img[no-zoom]), img[zoom]').each(
+      function () {
+        var element = document.createElement('a');
+        $(element).attr('data-fancybox', 'images');
+        $(element).attr('href', $(this).attr('src'));
+        $(this).wrap(element);
+      }
+    );
+  </script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</body>
+</html>
