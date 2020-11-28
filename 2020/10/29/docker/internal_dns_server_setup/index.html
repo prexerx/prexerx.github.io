@@ -1,259 +1,174 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width,initial-scale=1"><title>在内网快速利用docker搭建DNS服务器 | 妖灵山</title><meta name="keywords" content="docker,dns"><meta name="author" content="prexer"><meta name="copyright" content="prexer"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta http-equiv="Cache-Control" content="no-transform"><meta http-equiv="Cache-Control" content="no-siteapp"><meta name="description" content="如果你还犯愁，如何在内网搭建DNS服务器，那么请看看这里吧。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="在内网快速利用docker搭建DNS服务器">
+<meta property="og:url" content="http://example.com/2020/10/29/docker/internal_dns_server_setup/index.html">
+<meta property="og:site_name" content="妖灵山">
+<meta property="og:description" content="如果你还犯愁，如何在内网搭建DNS服务器，那么请看看这里吧。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://example.com/images/blog-images/dns_setup.png">
+<meta property="article:published_time" content="2020-10-29T07:05:35.000Z">
+<meta property="article:modified_time" content="2020-11-28T14:18:32.271Z">
+<meta property="article:author" content="prexer">
+<meta property="article:tag" content="docker">
+<meta property="article:tag" content="dns">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/blog-images/dns_setup.png"><link rel="shortcut icon" href="/img/favicon.png"><link rel="canonical" href="http://example.com/2020/10/29/docker/internal_dns_server_setup/"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/node-snackbar/dist/snackbar.min.css"><script>var GLOBAL_CONFIG = { 
+  root: '/',
+  algolia: undefined,
+  localSearch: {"path":"search.xml","languages":{"hits_empty":"找不到您查询的内容：${query}"}},
+  translate: undefined,
+  noticeOutdate: undefined,
+  highlight: {"plugin":"highlighjs","highlightCopy":false,"highlightLang":false},
+  copy: {
+    success: '复制成功',
+    error: '复制错误',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '天',
+  date_suffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: {"limitCount":50,"languages":{"author":"作者: prexer","link":"链接: ","source":"来源: 妖灵山","info":"著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。"}},
+  ClickShowText: undefined,
+  lightbox: 'fancybox',
+  Snackbar: {"chs_to_cht":"你已切换为繁体","cht_to_chs":"你已切换为简体","day_to_night":"你已切换为深色模式","night_to_day":"你已切换为浅色模式","bgLight":"#49b1f5","bgDark":"#121212","position":"bottom-left"},
+  source: {
+    jQuery: 'https://cdn.jsdelivr.net/npm/jquery@latest/dist/jquery.min.js',
+    justifiedGallery: {
+      js: 'https://cdn.jsdelivr.net/npm/justifiedGallery/dist/js/jquery.justifiedGallery.min.js',
+      css: 'https://cdn.jsdelivr.net/npm/justifiedGallery/dist/css/justifiedGallery.min.css'
+    },
+    fancybox: {
+      js: 'https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@latest/dist/jquery.fancybox.min.js',
+      css: 'https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@latest/dist/jquery.fancybox.min.css'
+    }
+  },
+  isPhotoFigcaption: true,
+  islazyload: false,
+  isanchor: false
+};
 
+var saveToLocal = {
+  set: function setWithExpiry(key, value, ttl) {
+    const now = new Date()
+    const expiryDay = ttl * 86400000
+    const item = {
+      value: value,
+      expiry: now.getTime() + expiryDay,
+    }
+    localStorage.setItem(key, JSON.stringify(item))
+  },
 
-<!DOCTYPE html>
-<html lang="zh-CN" data-default-color-scheme=&#34;auto&#34;>
+  get: function getWithExpiry(key) {
+    const itemStr = localStorage.getItem(key)
 
+    if (!itemStr) {
+      return undefined
+    }
+    const item = JSON.parse(itemStr)
+    const now = new Date()
 
+    if (now.getTime() > item.expiry) {
+      localStorage.removeItem(key)
+      return undefined
+    }
+    return item.value
+  }
+}
 
-<head>
-  <meta charset="UTF-8">
-  <link rel="apple-touch-icon" sizes="76x76" href="/img/favicon.png">
-  <link rel="icon" type="image/png" href="/img/favicon.png">
-  <meta name="viewport"
-        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
-  <meta http-equiv="x-ua-compatible" content="ie=edge">
-  
-  <meta name="theme-color" content="#2f4154">
-  <meta name="description" content="">
-  <meta name="author" content="prexer">
-  <meta name="keywords" content="">
-  <title>在内网快速利用docker搭建DNS服务器 - Prexer&#39;s Blog</title>
+// https://stackoverflow.com/questions/16839698/jquery-getscript-alternative-in-native-javascript
+const getScript = url => new Promise((resolve, reject) => {
+  const script = document.createElement('script')
+  script.src = url
+  script.async = true
+  script.onerror = reject
+  script.onload = script.onreadystatechange = function() {
+    const loadState = this.readyState
+    if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+    script.onload = script.onreadystatechange = null
+    resolve()
+  }
+  document.head.appendChild(script)
+})</script><script id="config_change">var GLOBAL_CONFIG_SITE = { 
+  isPost: true,
+  isHome: false,
+  isHighlightShrink: false,
+  isToc: true,
+  postUpdate: '2020-11-28 14:18:32'
+}</script><noscript><style type="text/css">
+  #nav {
+    opacity: 1
+  }
+  .justified-gallery img {
+    opacity: 1
+  }
 
-  <link  rel="stylesheet" href="https://cdn.staticfile.org/twitter-bootstrap/4.4.1/css/bootstrap.min.css" />
-
-
-  <link  rel="stylesheet" href="https://cdn.staticfile.org/github-markdown-css/4.0.0/github-markdown.min.css" />
-  <link  rel="stylesheet" href="/lib/hint/hint.min.css" />
-
-  
-    
-    
-      
-      <link  rel="stylesheet" href="https://cdn.staticfile.org/highlight.js/10.0.0/styles/gruvbox-dark.min.css" />
-    
-  
-
-  
-
-
-<!-- 主题依赖的图标库，不要自行修改 -->
-
-<link rel="stylesheet" href="//at.alicdn.com/t/font_1749284_pf9vaxs7x7b.css">
-
-
-
-<link rel="stylesheet" href="//at.alicdn.com/t/font_1736178_kmeydafke9r.css">
-
-
-<link  rel="stylesheet" href="/css/main.css" />
-
-<!-- 自定义样式保持在最底部 -->
-
-
-  <script  src="/js/utils.js" ></script>
-  <script  src="/js/color-schema.js" ></script>
-<meta name="generator" content="Hexo 5.2.0"></head>
-
-
-<body>
-  <header style="height: 70vh;">
-    <nav id="navbar" class="navbar fixed-top  navbar-expand-lg navbar-dark scrolling-navbar">
-  <div class="container">
-    <a class="navbar-brand"
-       href="/">&nbsp;<strong>妖灵山</strong>&nbsp;</a>
-
-    <button id="navbar-toggler-btn" class="navbar-toggler" type="button" data-toggle="collapse"
-            data-target="#navbarSupportedContent"
-            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
-      <div class="animated-icon"><span></span><span></span><span></span></div>
-    </button>
-
-    <!-- Collapsible content -->
-    <div class="collapse navbar-collapse" id="navbarSupportedContent">
-      <ul class="navbar-nav ml-auto text-center">
-        
-          
-          
-          
-          
-            <li class="nav-item">
-              <a class="nav-link" href="/">
-                <i class="iconfont icon-home-fill"></i>
-                首页
-              </a>
-            </li>
-          
-        
-          
-          
-          
-          
-            <li class="nav-item">
-              <a class="nav-link" href="/archives/">
-                <i class="iconfont icon-archive-fill"></i>
-                归档
-              </a>
-            </li>
-          
-        
-          
-          
-          
-          
-            <li class="nav-item">
-              <a class="nav-link" href="/categories/">
-                <i class="iconfont icon-category-fill"></i>
-                分类
-              </a>
-            </li>
-          
-        
-          
-          
-          
-          
-            <li class="nav-item">
-              <a class="nav-link" href="/tags/">
-                <i class="iconfont icon-tags-fill"></i>
-                标签
-              </a>
-            </li>
-          
-        
-          
-          
-          
-          
-            <li class="nav-item">
-              <a class="nav-link" href="/about/">
-                <i class="iconfont icon-user-fill"></i>
-                关于
-              </a>
-            </li>
-          
-        
-          
-          
-          
-          
-            <li class="nav-item">
-              <a class="nav-link" href="/links/">
-                <i class="iconfont icon-link-fill"></i>
-                友链
-              </a>
-            </li>
-          
-        
-        
-          <li class="nav-item" id="search-btn">
-            <a class="nav-link" data-toggle="modal" data-target="#modalSearch">&nbsp;<i
-                class="iconfont icon-search"></i>&nbsp;</a>
-          </li>
-        
-        
-          <li class="nav-item" id="color-toggle-btn">
-            <a class="nav-link" href="javascript:">&nbsp;<i
-                class="iconfont icon-dark" id="color-toggle-icon"></i>&nbsp;</a>
-          </li>
-        
-      </ul>
-    </div>
-  </div>
-</nav>
-
-    <div class="banner intro-2" id="background" parallax=true
-         style="background: url('/img/site-fixed-images/dead-cells-01.jpg') no-repeat center center;
-           background-size: cover;">
-      <div class="full-bg-img">
-        <div class="mask flex-center" style="background-color: rgba(0, 0, 0, 0.3)">
-          <div class="container page-header text-center fade-in-up">
-            <span class="h2" id="subtitle">
-              
-            </span>
-
-            
-              <div class="mt-3">
-  
-    <span class="post-meta mr-2">
-      <i class="iconfont icon-author" aria-hidden="true"></i>
-      prexer
-    </span>
-  
-  
-    <span class="post-meta">
-      <i class="iconfont icon-date-fill" aria-hidden="true"></i>
-      <time datetime="2020-10-29 07:05" pubdate>
-        2020年10月29日 早上
-      </time>
-    </span>
-  
+  #recent-posts time,
+  #post-meta time {
+    display: inline !important
+  }
+</style></noscript><script>(function () {  window.activateDarkMode = function () {
+    document.documentElement.setAttribute('data-theme', 'dark')
+    if (document.querySelector('meta[name="theme-color"]') !== null) {
+      document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+    }
+  }
+  window.activateLightMode = function () {
+    document.documentElement.setAttribute('data-theme', 'light')
+   if (document.querySelector('meta[name="theme-color"]') !== null) {
+      document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+    }
+  }
+  const autoChangeMode = '2'
+  const t = saveToLocal.get('theme')
+  if (autoChangeMode === '1') {
+    const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches
+    const isLightMode = window.matchMedia('(prefers-color-scheme: light)').matches
+    const isNotSpecified = window.matchMedia('(prefers-color-scheme: no-preference)').matches
+    const hasNoSupport = !isDarkMode && !isLightMode && !isNotSpecified
+    if (t === undefined) {
+      if (isLightMode) activateLightMode()
+      else if (isDarkMode) activateDarkMode()
+      else if (isNotSpecified || hasNoSupport) {
+        const now = new Date()
+        const hour = now.getHours()
+        const isNight = hour <= 6 || hour >= 18
+        isNight ? activateDarkMode() : activateLightMode()
+      }
+      window.matchMedia('(prefers-color-scheme: dark)').addListener(function (e) {
+        if (saveToLocal.get('theme') === undefined) {
+          e.matches ? activateDarkMode() : activateLightMode()
+        }
+      })
+    } else if (t === 'light') activateLightMode()
+    else activateDarkMode()
+  } else if (autoChangeMode === '2') {
+    const now = new Date()
+    const hour = now.getHours()
+    const isNight = hour <= 6 || hour >= 18
+    if (t === undefined) isNight ? activateDarkMode() : activateLightMode()
+    else if (t === 'light') activateLightMode()
+    else activateDarkMode()
+  } else {
+    if (t === 'dark') activateDarkMode()
+    else if (t === 'light') activateLightMode()
+  }const asideStatus = saveToLocal.get('aside-status')
+if (asideStatus !== undefined) {
+   if (asideStatus === 'hide') {
+     document.documentElement.classList.add('hide-aside')
+   } else {
+     document.documentElement.classList.remove('hide-aside')
+   }
+}})()</script><meta name="generator" content="Hexo 5.2.0"></head><body><div id="loading-box"><div class="loading-left-bg"></div><div class="loading-right-bg"></div><div class="spinner-box"><div class="configure-border-1"><div class="configure-core"></div></div><div class="configure-border-2"><div class="configure-core"></div></div><div class="loading-word">加载中...</div></div></div><div id="web_bg"></div><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="author-avatar"><img class="avatar-img" src="/images/site/header.jpg" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="site-data"><div class="data-item is-center"><div class="data-item-link"><a href="/archives/"><div class="headline">文章</div><div class="length-num">5</div></a></div></div><div class="data-item is-center"><div class="data-item-link"><a href="/tags/"><div class="headline">标签</div><div class="length-num">15</div></a></div></div><div class="data-item is-center"><div class="data-item-link"><a href="/categories/"><div class="headline">分类</div><div class="length-num">7</div></a></div></div></div><hr/><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 时间轴</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div><div class="menus_item"><a class="site-page" href="/talktalk/"><i class="fa-fw fas fa-comment-dots"></i><span> 留言板</span></a></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fas fa-heart"></i><span> 关于</span></a></div></div></div></div><div id="body-wrap"><header class="post-bg" id="page-header" style="background-image: url(/images/site/index_home_top.jpg)"><nav id="nav"><span id="blog_name"><a id="site-name" href="/">妖灵山</a></span><div id="menus"><div id="search-button"><a class="site-page social-icon search"><i class="fas fa-search fa-fw"></i><span> 搜索</span></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 时间轴</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div><div class="menus_item"><a class="site-page" href="/talktalk/"><i class="fa-fw fas fa-comment-dots"></i><span> 留言板</span></a></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fas fa-heart"></i><span> 关于</span></a></div></div><div id="toggle-menu"><a class="site-page"><i class="fas fa-bars fa-fw"></i></a></div></div></nav><div id="post-info"><h1 class="post-title">在内网快速利用docker搭建DNS服务器</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2020-10-29T07:05:35.000Z" title="发表于 2020-10-29 07:05:35">2020-10-29</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2020-11-28T14:18:32.271Z" title="更新于 2020-11-28 14:18:32">2020-11-28</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/docker/">docker</a><i class="fas fa-angle-right post-meta-separator"></i><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/docker/DNS/">DNS</a></span></div><div class="meta-secondline"> <span class="post-meta-separator">|</span><span class="post-meta-wordcount"><i class="far fa-file-word fa-fw post-meta-icon"></i><span class="post-meta-label">字数总计:</span><span class="word-count">1.9k</span><span class="post-meta-separator">|</span><i class="far fa-clock fa-fw post-meta-icon"></i><span class="post-meta-label">阅读时长:</span><span>7分钟</span></span><span class="post-meta-separator">|</span><span class="post-meta-pv-cv"><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">阅读量:</span><span id="busuanzi_value_page_pv"></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="post-content" id="article-container"><div class="note light flat"><p>如果你还犯愁，如何在内网搭建DNS服务器，那么请看看这里吧。</p>
 </div>
-
-<div class="mt-1">
-  
-    
-    <span class="post-meta mr-2">
-      <i class="iconfont icon-chart"></i>
-      1.9k 字
-    </span>
-  
-
-  
-    
-    <span class="post-meta mr-2">
-      <i class="iconfont icon-clock-fill"></i>
-      
-      
-      25
-       分钟
-    </span>
-  
-
-  
-  
-    
-      <!-- 不蒜子统计文章PV -->
-      <span id="busuanzi_container_page_pv" style="display: none">
-        <i class="iconfont icon-eye" aria-hidden="true"></i>
-        <span id="busuanzi_value_page_pv"></span> 次
-      </span>
-    
-  
-</div>
-
-            
-          </div>
-
-          
-        </div>
-      </div>
-    </div>
-  </header>
-
-  <main>
-    
-      
-
-<div class="container-fluid">
-  <div class="row">
-    <div class="d-none d-lg-block col-lg-2"></div>
-    <div class="col-lg-8 nopadding-md">
-      <div class="container nopadding-md" id="board-ctn">
-        <div class="py-5" id="board">
-          <article class="post-content mx-auto" id="post">
-            <!-- SEO header -->
-            <h1 style="display: none">在内网快速利用docker搭建DNS服务器</h1>
-            
-              <p class="note note-info">
-                
-                  本文最后更新于：2020年10月30日 下午
-                
-              </p>
-            
-            <div class="markdown-body" id="post-body">
-              <div class="note note-light">
-            <p>如果你还犯愁，如何在内网搭建DNS服务器，那么请看看这里吧。</p>
-          </div>
 
 <a id="more"></a>
 
@@ -263,25 +178,12 @@
 <p>为了顺利进行下一步，需要确保你的机器上没有开启53端口，也就是说你的主机不是一个DNS Server。</p>
 <p>如何确定呢？当然要使用<code>netstat命令</code>来查看端口，当然配合<code>lsof命令</code>也许会更明确。</p>
 <p>比如笔者本机就是这样的：</p>
-<div class="hljs"><pre><code class="hljs shell">prexer $ netstat -ntulp | grep 53
-(Not all processes could be identified, non-owned process info
- will not be shown, you would have to be root to see it all.)
-tcp        0      0 127.0.0.53:53           0.0.0.0:*               LISTEN      -
-udp        0      0 127.0.0.53:53           0.0.0.0:*                           -
-udp        0      0 0.0.0.0:5353            0.0.0.0:*                           -
-udp6       0      0 :::5353                 :::*                                -
-
-prexer $ sudo lsof -i:53
-COMMAND   PID            USER   FD   TYPE DEVICE SIZE/OFF NODE NAME
-systemd-r 778 systemd-resolve   12u  IPv4  20918      0t0  UDP localhost:domain
-systemd-r 778 systemd-resolve   13u  IPv4  20919      0t0  TCP localhost:domain (LISTEN)</code></pre></div>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">prexer $ netstat -ntulp | grep 53</span><br><span class="line">(Not all processes could be identified, non-owned process info</span><br><span class="line"> will not be shown, you would have to be root to see it all.)</span><br><span class="line">tcp        0      0 127.0.0.53:53           0.0.0.0:*               LISTEN      -</span><br><span class="line">udp        0      0 127.0.0.53:53           0.0.0.0:*                           -</span><br><span class="line">udp        0      0 0.0.0.0:5353            0.0.0.0:*                           -</span><br><span class="line">udp6       0      0 :::5353                 :::*                                -</span><br><span class="line"></span><br><span class="line">prexer $ sudo lsof -i:53</span><br><span class="line">COMMAND   PID            USER   FD   TYPE DEVICE SIZE/OFF NODE NAME</span><br><span class="line">systemd-r 778 systemd-resolve   12u  IPv4  20918      0t0  UDP localhost:domain</span><br><span class="line">systemd-r 778 systemd-resolve   13u  IPv4  20919      0t0  TCP localhost:domain (LISTEN)</span><br></pre></td></tr></table></figure>
 
 
 
 <p>如果找到了端口占用，只要关闭指定的程序即可，简单来说就是这样：</p>
-<div class="hljs"><pre><code class="hljs livecodeserver">prexer $ sudo systemctl <span class="hljs-built_in">stop</span> systemd-<span class="hljs-built_in">resolve</span>
-<span class="hljs-comment"># 或者</span>
-prexer $ sudo <span class="hljs-built_in">kill</span> your_pid</code></pre></div>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">prexer $ sudo systemctl stop systemd-resolve</span><br><span class="line"># 或者</span><br><span class="line">prexer $ sudo kill your_pid</span><br></pre></td></tr></table></figure>
 
 
 
@@ -297,484 +199,107 @@ prexer $ sudo <span class="hljs-built_in">kill</span> your_pid</code></pre></div
 <h2 id="构建一个符合你胃口的DNSmasq的配置文件"><a href="#构建一个符合你胃口的DNSmasq的配置文件" class="headerlink" title="构建一个符合你胃口的DNSmasq的配置文件"></a>构建一个符合你胃口的DNSmasq的配置文件</h2><p>对于配置docker镜像而言，配置文件肯定是逃不了的，你可以先看看<a target="_blank" rel="noopener" href="http://oss.segetech.com/intra/srv/dnsmasq.conf">官方的配置文档</a>，了解有什么后，再动手也不迟。</p>
 <p>这里我们介绍一个通用且简单的配置，当你学完后可以自己进行修改，多开心。</p>
 <p>配置文件及解释如下：(将这个文件保存为：dnsmasq.conf文件，存储在你当前的工作目录或者任意可指定的目录即可)</p>
-<div class="hljs"><pre><code class="hljs routeros"><span class="hljs-comment"># filename: dnsmasq.conf</span>
-
-<span class="hljs-comment"># 需要存储log，后续再命令行中指定log的限制大小</span>
-log-queries
-
-<span class="hljs-comment"># 指定一个自定义的解析文件，它可以保证你不用修改原始的配置文件/etc/resolv.conf</span>
-<span class="hljs-attribute">resolv-file</span>=/tmp/resolv.conf
-
-<span class="hljs-comment"># 一个测试的名字，IP地址是内部网络的另一台主机，通过这个名字来完成后续的验证</span>
-<span class="hljs-attribute">address</span>=/hello.remote/10.22.52.229
-
-<span class="hljs-comment"># upstream nameserver，也就是找不到靠上游的道理</span>
-<span class="hljs-comment"># server=/localnet/127.0.0.1 # 不加也可以，添加非公开的内网DNS，就像联机打游戏一样 </span>
-<span class="hljs-attribute">server</span>=10.22.0.1
-<span class="hljs-attribute">server</span>=10.22.0.2</code></pre></div>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"># filename: dnsmasq.conf</span><br><span class="line"></span><br><span class="line"># 需要存储log，后续再命令行中指定log的限制大小</span><br><span class="line">log-queries</span><br><span class="line"></span><br><span class="line"># 指定一个自定义的解析文件，它可以保证你不用修改原始的配置文件&#x2F;etc&#x2F;resolv.conf</span><br><span class="line">resolv-file&#x3D;&#x2F;tmp&#x2F;resolv.conf</span><br><span class="line"></span><br><span class="line"># 一个测试的名字，IP地址是内部网络的另一台主机，通过这个名字来完成后续的验证</span><br><span class="line">address&#x3D;&#x2F;hello.remote&#x2F;10.22.52.229</span><br><span class="line"></span><br><span class="line"># upstream nameserver，也就是找不到靠上游的道理</span><br><span class="line"># server&#x3D;&#x2F;localnet&#x2F;127.0.0.1 # 不加也可以，添加非公开的内网DNS，就像联机打游戏一样 </span><br><span class="line">server&#x3D;10.22.0.1</span><br><span class="line">server&#x3D;10.22.0.2</span><br></pre></td></tr></table></figure>
 
 <p>复制一份解析文件：</p>
-<div class="hljs"><pre><code class="hljs shell">prexer $ sudo cp /etc/resolv.conf /tmp/resolv.conf</code></pre></div>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">prexer $ sudo cp /etc/resolv.conf /tmp/resolv.conf</span><br></pre></td></tr></table></figure>
 
 <p>到了这里，基本的配置就算完成了，很简单吧，之后我们开始启动DNSmasq容器。</p>
 <h2 id="开始构建激动人心的docker容器"><a href="#开始构建激动人心的docker容器" class="headerlink" title="开始构建激动人心的docker容器"></a>开始构建激动人心的docker容器</h2><p>众所周知，容器的使用廉价的可怜，所以你几乎不用知道细节就可以搭建一个完美的沙盒环境（一点不知道也不行哈…)。按照官方文档的指示，你当然可以修改docker启动的参数，然后鼓捣鼓捣自己的配置，反正玩不坏，尽情尝试。不过为了教学，请看看我的例子：</p>
-<div class="hljs"><pre><code class="hljs shell">docker run -d\
-    --name dnsmasq \
-    --rm \
-    -p 53:53/udp \
-    -p 53:53/tcp \
-    -p 8080:8080 \
-    -v `pwd`/dnsmasq.conf:/etc/dnsmasq.conf \
-    --log-opt &quot;max-size=100m&quot; \
-    -e &quot;HTTP_USER=root&quot; \
-    -e &quot;HTTP_PASS=root&quot; \
-    jpillora/dnsmasq</code></pre></div>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">docker run -d\</span><br><span class="line">    --name dnsmasq \</span><br><span class="line">    --rm \</span><br><span class="line">    -p 53:53/udp \</span><br><span class="line">    -p 53:53/tcp \</span><br><span class="line">    -p 8080:8080 \</span><br><span class="line">    -v `pwd`/dnsmasq.conf:/etc/dnsmasq.conf \</span><br><span class="line">    --log-opt &quot;max-size=100m&quot; \</span><br><span class="line">    -e &quot;HTTP_USER=root&quot; \</span><br><span class="line">    -e &quot;HTTP_PASS=root&quot; \</span><br><span class="line">    jpillora/dnsmasq</span><br></pre></td></tr></table></figure>
 
 <p>一些简单的参数解释：</p>
-<div class="hljs"><pre><code class="hljs livescript">docker run -d<span class="hljs-string">\</span> <span class="hljs-comment"># 以守护进程的方式运行容器</span>
-    --name dnsmasq <span class="hljs-string">\</span> <span class="hljs-comment"># 容器的名字</span>
-    --rm <span class="hljs-string">\</span> <span class="hljs-comment"># 用完后删除，即你stop的时候就会删除哦</span>
-    -p <span class="hljs-number">53</span>:<span class="hljs-number">53</span>/udp <span class="hljs-string">\</span> <span class="hljs-comment"># 暴露容器的53端口和宿主机关联，udp/tcp协议如果你不懂，简单百科一下</span>
-    -p <span class="hljs-number">53</span>:<span class="hljs-number">53</span>/tcp <span class="hljs-string">\</span>
-    -p <span class="hljs-number">8080</span>:<span class="hljs-number">8080</span> <span class="hljs-string">\</span> <span class="hljs-comment"># 暴露容器的web端口，便于后续再网页上查看和配置</span>
-    -v `pwd`/dnsmasq.conf:/etc/dnsmasq.conf <span class="hljs-string">\</span> <span class="hljs-comment"># 重点，配置文件的关联，这个逻辑卷的知识你可以自行科普</span>
-    --log-opt <span class="hljs-string">&quot;max-size=100m&quot;</span> <span class="hljs-string">\</span> <span class="hljs-comment"># 限制输出的log文件的大小，很简单是吧，呼应前文</span>
-    -e <span class="hljs-string">&quot;HTTP_USER=root&quot;</span> <span class="hljs-string">\</span> <span class="hljs-comment"># 登录web的用户名和密码</span>
-    -e <span class="hljs-string">&quot;HTTP_PASS=root&quot;</span> <span class="hljs-string">\</span>
-    jpillora/dnsmasq <span class="hljs-comment"># 包含web的基础dnsmasq镜像</span></code></pre></div>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">docker run -d\ # 以守护进程的方式运行容器</span><br><span class="line">    --name dnsmasq \ # 容器的名字</span><br><span class="line">    --rm \ # 用完后删除，即你stop的时候就会删除哦</span><br><span class="line">    -p 53:53&#x2F;udp \ # 暴露容器的53端口和宿主机关联，udp&#x2F;tcp协议如果你不懂，简单百科一下</span><br><span class="line">    -p 53:53&#x2F;tcp \</span><br><span class="line">    -p 8080:8080 \ # 暴露容器的web端口，便于后续再网页上查看和配置</span><br><span class="line">    -v &#96;pwd&#96;&#x2F;dnsmasq.conf:&#x2F;etc&#x2F;dnsmasq.conf \ # 重点，配置文件的关联，这个逻辑卷的知识你可以自行科普</span><br><span class="line">    --log-opt &quot;max-size&#x3D;100m&quot; \ # 限制输出的log文件的大小，很简单是吧，呼应前文</span><br><span class="line">    -e &quot;HTTP_USER&#x3D;root&quot; \ # 登录web的用户名和密码</span><br><span class="line">    -e &quot;HTTP_PASS&#x3D;root&quot; \</span><br><span class="line">    jpillora&#x2F;dnsmasq # 包含web的基础dnsmasq镜像</span><br></pre></td></tr></table></figure>
 
 
 
 <p>查看启动状态，只是一些基础的docker指令：</p>
-<div class="hljs"><pre><code class="hljs shell"><span class="hljs-meta">#</span><span class="bash"> &gt; docker ps -a |grep dnsmasq <span class="hljs-comment"># 看容器的启动状态</span></span>
-prexer $ docker ps -a|grep dnsmasq
-6d75bfc34244        jpillora/dnsmasq                       &quot;webproc --config /e…&quot;   18 seconds ago      Up 17 seconds       0.0.0.0:53-&gt;53/tcp, 0.0.0.0:8080-&gt;8080/tcp, 0.0.0.0:53-&gt;53/udp   dnsmasq
-
-<span class="hljs-meta">#</span><span class="bash"> &gt; docker logs -f dnsmasq <span class="hljs-comment"># 看容器的标准输出log</span></span>
-prexer $ docker logs -f dnsmasq
-[webproc] 2020/10/30 00:37:30 loaded config files changes from disk
-[webproc] 2020/10/30 00:37:30 agent listening on http://0.0.0.0:8080...
-dnsmasq: started, version 2.80 cachesize 150
-dnsmasq: compile time options: IPv6 GNU-getopt no-DBus no-i18n no-IDN DHCP DHCPv6 no-Lua TFTP no-conntrack ipset auth no-DNSSEC loop-detect inotify dumpfile
-dnsmasq: using nameserver 10.22.0.2#53
-dnsmasq: using nameserver 10.22.0.1#53
-dnsmasq: read /etc/hosts - 7 addresses</code></pre></div>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash"> &gt; docker ps -a |grep dnsmasq <span class="comment"># 看容器的启动状态</span></span></span><br><span class="line">prexer $ docker ps -a|grep dnsmasq</span><br><span class="line">6d75bfc34244        jpillora/dnsmasq                       &quot;webproc --config /e…&quot;   18 seconds ago      Up 17 seconds       0.0.0.0:53-&gt;53/tcp, 0.0.0.0:8080-&gt;8080/tcp, 0.0.0.0:53-&gt;53/udp   dnsmasq</span><br><span class="line"></span><br><span class="line"><span class="meta">#</span><span class="bash"> &gt; docker logs -f dnsmasq <span class="comment"># 看容器的标准输出log</span></span></span><br><span class="line">prexer $ docker logs -f dnsmasq</span><br><span class="line">[webproc] 2020/10/30 00:37:30 loaded config files changes from disk</span><br><span class="line">[webproc] 2020/10/30 00:37:30 agent listening on http://0.0.0.0:8080...</span><br><span class="line">dnsmasq: started, version 2.80 cachesize 150</span><br><span class="line">dnsmasq: compile time options: IPv6 GNU-getopt no-DBus no-i18n no-IDN DHCP DHCPv6 no-Lua TFTP no-conntrack ipset auth no-DNSSEC loop-detect inotify dumpfile</span><br><span class="line">dnsmasq: using nameserver 10.22.0.2#53</span><br><span class="line">dnsmasq: using nameserver 10.22.0.1#53</span><br><span class="line">dnsmasq: read /etc/hosts - 7 addresses</span><br></pre></td></tr></table></figure>
 
 <p>至于是否启动成功，看看输出结果，对比对比就成了。</p>
 <h2 id="来吧，一起可视化查看与验证"><a href="#来吧，一起可视化查看与验证" class="headerlink" title="来吧，一起可视化查看与验证"></a>来吧，一起可视化查看与验证</h2><p>从浏览器登录你已经配置的主机，方法如下：</p>
-<div class="hljs"><pre><code class="hljs awk">在浏览器中输入：http:<span class="hljs-regexp">//</span>localhost:<span class="hljs-number">8080</span> 或者 http:<span class="hljs-regexp">//</span>remote_ip_address:<span class="hljs-number">8080</span></code></pre></div>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">在浏览器中输入：http:&#x2F;&#x2F;localhost:8080 或者 http:&#x2F;&#x2F;remote_ip_address:8080</span><br></pre></td></tr></table></figure>
 
 <p>这样就能到达登录界面，用户名和密码是之前命令行参数中配置的，请自行填写，效果如下：</p>
-<p><img src="/img/blog-images/dns_web_show.png" srcset="/img/loading.gif" alt="login web"></p>
+<p><img src="/img/blog-images/dns_web_show.png" alt="login web"></p>
 <p>登录后的界面如下：</p>
-<p><img src="/img/blog-images/dns_web_display.png" srcset="/img/loading.gif" alt="display web"></p>
+<p><img src="/img/blog-images/dns_web_display.png" alt="display web"></p>
 <p>在验证之前还需要一点知识要梳理：</p>
 <p>首先，之前复制的DNS解析文件<code>/tmp/resolv.conf</code>是配置的DNSmasq解析的上游服务文件，具体请看下面的解释：</p>
-<div class="hljs"><pre><code class="hljs vala"><span class="hljs-meta"># Change this line if you want dns to get its upstream servers from</span>
-<span class="hljs-meta"># somewhere other that /etc/resolv.conf</span>
-<span class="hljs-meta">#resolv-file=</span></code></pre></div>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"># Change this line if you want dns to get its upstream servers from</span><br><span class="line"># somewhere other that &#x2F;etc&#x2F;resolv.conf</span><br><span class="line">#resolv-file&#x3D;</span><br></pre></td></tr></table></figure>
 
 <p>很多同学在里面配置了<code>nameserver 127.0.0.1</code>本地的地址，想要使用本地的docker DNS服务，其实还不行，需要你真正配置本机的DNS解析文件才可以，也就是修改<code>/etc/resolv.conf</code>添加如下信息：</p>
-<div class="hljs"><pre><code class="hljs angelscript">nameserver <span class="hljs-number">127.0</span><span class="hljs-number">.0</span><span class="hljs-number">.1</span></code></pre></div>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">nameserver 127.0.0.1</span><br></pre></td></tr></table></figure>
 
 
 
 <p>到这里基本上可以进行下一步了。</p>
 <p>那么我们验证一下配置的结果吧：</p>
 <p>首先用你们最熟悉的<code>ping</code>指令，走个ICMP协议看看：</p>
-<div class="hljs"><pre><code class="hljs routeros">prexer $<span class="hljs-built_in"> ping </span>hello.remote -c 3
-PING hello.remote (10.22.52.229) 56(84) bytes of data.
-64 bytes <span class="hljs-keyword">from</span> CNSHZ-ED-SVR097.sierrawireless.local (10.22.52.229): <span class="hljs-attribute">icmp_seq</span>=1 <span class="hljs-attribute">ttl</span>=64 <span class="hljs-attribute">time</span>=0.190 ms
-64 bytes <span class="hljs-keyword">from</span> CNSHZ-ED-SVR097.sierrawireless.local (10.22.52.229): <span class="hljs-attribute">icmp_seq</span>=2 <span class="hljs-attribute">ttl</span>=64 <span class="hljs-attribute">time</span>=0.257 ms
-64 bytes <span class="hljs-keyword">from</span> CNSHZ-ED-SVR097.sierrawireless.local (10.22.52.229): <span class="hljs-attribute">icmp_seq</span>=3 <span class="hljs-attribute">ttl</span>=64 <span class="hljs-attribute">time</span>=0.230 ms
-
---- hello.remote<span class="hljs-built_in"> ping </span>statistics ---
-3 packets transmitted, 3 received, 0% packet loss, time 1998ms
-rtt min/avg/max/mdev = 0.190/0.225/0.257/0.032 ms</code></pre></div>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">prexer $ ping hello.remote -c 3</span><br><span class="line">PING hello.remote (10.22.52.229) 56(84) bytes of data.</span><br><span class="line">64 bytes from CNSHZ-ED-SVR097.sierrawireless.local (10.22.52.229): icmp_seq&#x3D;1 ttl&#x3D;64 time&#x3D;0.190 ms</span><br><span class="line">64 bytes from CNSHZ-ED-SVR097.sierrawireless.local (10.22.52.229): icmp_seq&#x3D;2 ttl&#x3D;64 time&#x3D;0.257 ms</span><br><span class="line">64 bytes from CNSHZ-ED-SVR097.sierrawireless.local (10.22.52.229): icmp_seq&#x3D;3 ttl&#x3D;64 time&#x3D;0.230 ms</span><br><span class="line"></span><br><span class="line">--- hello.remote ping statistics ---</span><br><span class="line">3 packets transmitted, 3 received, 0% packet loss, time 1998ms</span><br><span class="line">rtt min&#x2F;avg&#x2F;max&#x2F;mdev &#x3D; 0.190&#x2F;0.225&#x2F;0.257&#x2F;0.032 ms</span><br></pre></td></tr></table></figure>
 
 
 
 <p>在来看看主机的IP地址映射关系，当然要用<code>host</code>指令：</p>
-<div class="hljs"><pre><code class="hljs routeros">prexer $ host hello.remote
-hello.remote has<span class="hljs-built_in"> address </span>10.22.52.229</code></pre></div>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">prexer $ host hello.remote</span><br><span class="line">hello.remote has address 10.22.52.229</span><br></pre></td></tr></table></figure>
 
 <p>其他的协议不用一一验证了，应为这是标准的端口，也是通用的tcp/udp协议簇，如果你还好奇，可以验证<code>ssh</code>或者<code>dig</code>之类的指令玩玩。</p>
 <h2 id="内网其他主机如何使用你的DNS服务器？"><a href="#内网其他主机如何使用你的DNS服务器？" class="headerlink" title="内网其他主机如何使用你的DNS服务器？"></a>内网其他主机如何使用你的DNS服务器？</h2><p>本机用当然还不够，要内网其他同事能够使用才行，其实用起来依旧很简单，就是在内网的任意机器上（可达你的主机），修改<code>/etc/resolv.conf</code>文件，添加一行：</p>
-<div class="hljs"><pre><code class="hljs xml">nameserver <span class="hljs-tag">&lt;<span class="hljs-name">your_dns_server_ip_address</span>&gt;</span></code></pre></div>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">nameserver &lt;your_dns_server_ip_address&gt;</span><br></pre></td></tr></table></figure>
 
 <p><code>&lt;your_dns_server_ip_address&gt;</code>这个替换你的主机IP就可以了。</p>
 <p>赶快用起来！^_^</p>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta">文章作者: </span><span class="post-copyright-info"><a href="mailto:undefined">prexer</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta">文章链接: </span><span class="post-copyright-info"><a href="http://example.com/2020/10/29/docker/internal_dns_server_setup/">http://example.com/2020/10/29/docker/internal_dns_server_setup/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta">版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来自 <a href="http://example.com" target="_blank">妖灵山</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/docker/">docker</a><a class="post-meta__tags" href="/tags/dns/">dns</a></div><div class="post_share"><div class="social-share" data-image="/images/blog-images/dns_setup.png" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/social-share.js/dist/css/share.min.css"><script src="https://cdn.jsdelivr.net/npm/social-share.js/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><div class="prev-post pull-left"><a href="/2020/10/30/ca-certificate-authentication-md/"><img class="prev-cover" src="/images/blog-images/ca_logo.png" onerror="onerror=null;src='/img/404.jpg'" alt="cover of previous post"><div class="pagination-info"><div class="label">上一篇</div><div class="prev_info">你想通过本地构建CA来颁发证书么？</div></div></a></div><div class="next-post pull-right"><a href="/2020/10/24/base/git_speed_up_downloading/"><img class="next-cover" src="/images/site/dead-cells-04.jpeg" onerror="onerror=null;src='/img/404.jpg'" alt="cover of next post"><div class="pagination-info"><div class="label">下一篇</div><div class="next_info">推荐一个加速git仓库下载的方法</div></div></a></div></nav><hr/><div id="post-comment"><div class="comment-head"><div class="comment-headline"><i class="fas fa-comments fa-fw"></i><span> 评论</span></div></div><div class="comment-wrap"><div><div class="vcomment" id="vcomment"></div></div></div></div></div><div class="aside_content" id="aside_content"><div class="card-widget card-info"><div class="card-content"><div class="card-info-avatar is-center"><img class="avatar-img" src="/images/site/header.jpg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/><div class="author-info__name">prexer</div><div class="author-info__description">Email-To-Me: prexer@163.com</div></div><div class="card-info-data"><div class="card-info-data-item is-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">5</div></a></div><div class="card-info-data-item is-center"><a href="/tags/"><div class="headline">标签</div><div class="length-num">15</div></a></div><div class="card-info-data-item is-center"><a href="/categories/"><div class="headline">分类</div><div class="length-num">7</div></a></div></div><a class="button--animated" id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/prexerx"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons is-center"><a class="social-icon" href="https://gitee.com/prexer" target="_blank" title="Gitee"><i class="fab fa-git-square"></i></a><a class="social-icon" href="https://github.com/prexerx" target="_blank" title="Github"><i class="fab fa-github"></i></a><a class="social-icon" href="mailto:prexer@163.com" target="_blank" title="Email"><i class="fas fa-envelope"></i></a></div></div></div><div class="card-widget card-announcement"><div class="card-content"><div class="item-headline"><i class="fas fa-bullhorn card-announcement-animation"></i><span>公告</span></div><div class="announcement_content">欢迎来到`妖灵山`读文章，如果我们能帮到你，那确实是一件令人开心的事！</div></div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="card-content"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%BD%93%E5%89%8D%E4%B8%BB%E6%9C%BA%E6%98%AF%E5%90%A6%E5%B7%B2%E7%BB%8F%E5%90%AF%E7%94%A853%E7%AB%AF%E5%8F%A3%EF%BC%9F"><span class="toc-number">1.</span> <span class="toc-text">当前主机是否已经启用53端口？</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%94%A8%E4%BB%80%E4%B9%88%E6%9D%A5%E6%9E%84%E5%BB%BADNS%E6%9C%8D%E5%8A%A1%E5%99%A8%E5%91%A2%EF%BC%9F"><span class="toc-number">2.</span> <span class="toc-text">用什么来构建DNS服务器呢？</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%9E%84%E5%BB%BA%E4%B8%80%E4%B8%AA%E7%AC%A6%E5%90%88%E4%BD%A0%E8%83%83%E5%8F%A3%E7%9A%84DNSmasq%E7%9A%84%E9%85%8D%E7%BD%AE%E6%96%87%E4%BB%B6"><span class="toc-number">3.</span> <span class="toc-text">构建一个符合你胃口的DNSmasq的配置文件</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%BC%80%E5%A7%8B%E6%9E%84%E5%BB%BA%E6%BF%80%E5%8A%A8%E4%BA%BA%E5%BF%83%E7%9A%84docker%E5%AE%B9%E5%99%A8"><span class="toc-number">4.</span> <span class="toc-text">开始构建激动人心的docker容器</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%9D%A5%E5%90%A7%EF%BC%8C%E4%B8%80%E8%B5%B7%E5%8F%AF%E8%A7%86%E5%8C%96%E6%9F%A5%E7%9C%8B%E4%B8%8E%E9%AA%8C%E8%AF%81"><span class="toc-number">5.</span> <span class="toc-text">来吧，一起可视化查看与验证</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%86%85%E7%BD%91%E5%85%B6%E4%BB%96%E4%B8%BB%E6%9C%BA%E5%A6%82%E4%BD%95%E4%BD%BF%E7%94%A8%E4%BD%A0%E7%9A%84DNS%E6%9C%8D%E5%8A%A1%E5%99%A8%EF%BC%9F"><span class="toc-number">6.</span> <span class="toc-text">内网其他主机如何使用你的DNS服务器？</span></a></li></ol></div></div></div><div class="card-widget card-recent-post"><div class="card-content"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item"><a class="thumbnail" href="/2020/11/03/terraform-azure-demo-doc/" title="Terraform Azure Demo开源项目的官方文档"><img src="/images/blog-images/terraform_logo.png" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="Terraform Azure Demo开源项目的官方文档"/></a><div class="content"><a class="title" href="/2020/11/03/terraform-azure-demo-doc/" title="Terraform Azure Demo开源项目的官方文档">Terraform Azure Demo开源项目的官方文档</a><time datetime="2020-11-03T01:45:37.000Z" title="发表于 2020-11-03 01:45:37">2020-11-03</time></div></div><div class="aside-list-item"><a class="thumbnail" href="/2020/10/30/ca-certificate-authentication-md/" title="你想通过本地构建CA来颁发证书么？"><img src="/images/blog-images/ca_logo.png" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="你想通过本地构建CA来颁发证书么？"/></a><div class="content"><a class="title" href="/2020/10/30/ca-certificate-authentication-md/" title="你想通过本地构建CA来颁发证书么？">你想通过本地构建CA来颁发证书么？</a><time datetime="2020-10-30T09:01:12.000Z" title="发表于 2020-10-30 09:01:12">2020-10-30</time></div></div><div class="aside-list-item"><a class="thumbnail" href="/2020/10/29/docker/internal_dns_server_setup/" title="在内网快速利用docker搭建DNS服务器"><img src="/images/blog-images/dns_setup.png" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="在内网快速利用docker搭建DNS服务器"/></a><div class="content"><a class="title" href="/2020/10/29/docker/internal_dns_server_setup/" title="在内网快速利用docker搭建DNS服务器">在内网快速利用docker搭建DNS服务器</a><time datetime="2020-10-29T07:05:35.000Z" title="发表于 2020-10-29 07:05:35">2020-10-29</time></div></div><div class="aside-list-item"><a class="thumbnail" href="/2020/10/24/base/git_speed_up_downloading/" title="推荐一个加速git仓库下载的方法"><img src="/images/site/dead-cells-04.jpeg" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="推荐一个加速git仓库下载的方法"/></a><div class="content"><a class="title" href="/2020/10/24/base/git_speed_up_downloading/" title="推荐一个加速git仓库下载的方法">推荐一个加速git仓库下载的方法</a><time datetime="2020-10-24T04:42:57.000Z" title="发表于 2020-10-24 04:42:57">2020-10-24</time></div></div><div class="aside-list-item"><a class="thumbnail" href="/2020/02/20/articles_writing_rules/" title="文章编写规范"><img src="/images/site/dead-cells-03.jpeg" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="文章编写规范"/></a><div class="content"><a class="title" href="/2020/02/20/articles_writing_rules/" title="文章编写规范">文章编写规范</a><time datetime="2020-02-20T20:02:20.000Z" title="发表于 2020-02-20 20:02:20">2020-02-20</time></div></div></div></div></div></div></div></main><footer id="footer" style="background-image: url(/images/site/index_home_top.jpg)"><div id="footer-wrap"><div class="copyright">&copy;2020 By prexer</div><div class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly</a></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="浅色和深色模式转换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside_config" type="button" title="设置"><i class="fas fa-cog"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><a id="to_comment" href="#post-comment" title="直达评论"><i class="fas fa-comments"></i></a><button id="go-up" type="button" title="回到顶部"><i class="fas fa-arrow-up"></i></button></div></div><div id="local-search"><div class="search-dialog"><div class="search-dialog__title" id="local-search-title">本地搜索</div><div id="local-input-panel"><div id="local-search-input"><div class="local-search-box"><input class="local-search-box--input" placeholder="搜索文章" type="text"/></div></div></div><hr/><div id="local-search-results"></div><span class="search-close-button"><i class="fas fa-times"></i></span></div><div id="search-mask"></div></div><div><script src="/js/utils.js"></script><script src="/js/main.js"></script><script src="https://cdn.jsdelivr.net/npm/node-snackbar/dist/snackbar.min.js"></script><script src="/js/search/local-search.js"></script><script>var preloader = {
+  endLoading: () => {
+    document.body.style.overflow = 'auto';
+    document.getElementById('loading-box').classList.add("loaded")
+  },
+  initLoading: () => {
+    document.body.style.overflow = '';
+    document.getElementById('loading-box').classList.remove("loaded")
 
-            </div>
-            <hr>
-            <div>
-              <div class="post-metas mb-3">
-                
-                  <div class="post-meta mr-3">
-                    <i class="iconfont icon-category"></i>
-                    
-                      <a class="hover-with-bg" href="/categories/docker-hello/">docker/hello</a>
-                    
-                  </div>
-                
-                
-                  <div class="post-meta">
-                    <i class="iconfont icon-tags"></i>
-                    
-                      <a class="hover-with-bg" href="/tags/docker/">docker</a>
-                    
-                      <a class="hover-with-bg" href="/tags/dns/">dns</a>
-                    
-                  </div>
-                
-              </div>
-              
-                <p class="note note-warning">本站所有文章除特别声明外，均采用 <a target="_blank" href="https://creativecommons.org/licenses/by-sa/4.0/deed.zh" rel="nofollow noopener noopener">CC BY-SA 4.0 协议</a> ，转载请注明出处！</p>
-              
-              
-                <div class="post-prevnext row">
-                  <article class="post-prev col-6">
-                    
-                    
-                      <a href="/2020/10/30/ca-certificate-authentication-md/">
-                        <i class="iconfont icon-arrowleft"></i>
-                        <span class="hidden-mobile">你想通过本地构建CA来颁发证书么？</span>
-                        <span class="visible-mobile">上一篇</span>
-                      </a>
-                    
-                  </article>
-                  <article class="post-next col-6">
-                    
-                    
-                      <a href="/2020/10/24/base/git_speed_up_downloading/">
-                        <span class="hidden-mobile">推荐一个加速git仓库下载的方法</span>
-                        <span class="visible-mobile">下一篇</span>
-                        <i class="iconfont icon-arrowright"></i>
-                      </a>
-                    
-                  </article>
-                </div>
-              
-            </div>
-
-            
-              <!-- Comments -->
-              <article class="comments" id="comments">
-                
-                
-  <div id="vcomments"></div>
-  <script type="text/javascript">
-    function loadValine() {
-      addScript('https://cdn.staticfile.org/valine/1.4.14/Valine.min.js', function () {
-        new Valine({
-          el: "#vcomments",
-          app_id: "qsamq3Y5DtW17GTEo8fUTR1q-gzGzoHsz",
-          app_key: "U3LxIC5Qmh7XJxc7oi8JWoJ2",
-          placeholder: "请评论和本文有关的技术内容，在发声之前也请你带上你的灵魂...",
-          path: window.location.pathname,
-          avatar: "retro",
-          meta: ["nick","mail","link"],
-          pageSize: "10",
-          lang: "zh-CN",
-          highlight: false,
-          recordIP: true,
-          serverURLs: "https://qsamq3y5.lc-cn-n1-shared.com",
-        });
-      });
+  }
+}
+window.addEventListener('load',()=> {preloader.endLoading()})</script><div class="js-pjax"><script>function loadValine () {
+  function initValine () {
+    let initData = {
+      el: '#vcomment',
+      appId: 'qsamq3Y5DtW17GTEo8fUTR1q-gzGzoHsz',
+      appKey: 'U3LxIC5Qmh7XJxc7oi8JWoJ2',
+      placeholder: '评论之前，请带上你的灵魂，谈论和本文有关的内容，如果是闲聊或者吐槽，请到留言板...',
+      avatar: 'monsterid',
+      meta: 'nick,mail,link'.split(','),
+      pageSize: '10',
+      lang: 'zh-CN',
+      recordIP: false,
+      serverURLs: 'https://qsamq3y5.lc-cn-n1-shared.com',
+      emojiCDN: '',
+      emojiMaps: "",
+      enableQQ: false,
+      path: window.location.pathname,
     }
-    waitElementVisible('vcomments', loadValine);
-  </script>
-  <noscript>Please enable JavaScript to view the <a target="_blank" href="https://valine.js.org" rel="nofollow noopener noopener">comments
-      powered by Valine.</a></noscript>
 
-
-              </article>
-            
-          </article>
-        </div>
-      </div>
-    </div>
-    
-      <div class="d-none d-lg-block col-lg-2 toc-container" id="toc-ctn">
-        <div id="toc">
-  <p class="toc-header"><i class="iconfont icon-list"></i>&nbsp;目录</p>
-  <div id="tocbot"></div>
-</div>
-
-      </div>
-    
-  </div>
-</div>
-
-<!-- Custom -->
-
-
-    
-  </main>
-
-  
-    <a id="scroll-top-button" href="#" role="button">
-      <i class="iconfont icon-arrowup" aria-hidden="true"></i>
-    </a>
-  
-
-  
-    <div class="modal fade" id="modalSearch" tabindex="-1" role="dialog" aria-labelledby="ModalLabel"
-     aria-hidden="true">
-  <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
-    <div class="modal-content">
-      <div class="modal-header text-center">
-        <h4 class="modal-title w-100 font-weight-bold">搜索</h4>
-        <button type="button" id="local-search-close" class="close" data-dismiss="modal" aria-label="Close">
-          <span aria-hidden="true">&times;</span>
-        </button>
-      </div>
-      <div class="modal-body mx-3">
-        <div class="md-form mb-5">
-          <input type="text" id="local-search-input" class="form-control validate">
-          <label data-error="x" data-success="v"
-                 for="local-search-input">关键词</label>
-        </div>
-        <div class="list-group" id="local-search-result"></div>
-      </div>
-    </div>
-  </div>
-</div>
-  
-
-  
-
-  
-
-  <footer class="mt-5">
-  <div class="text-center py-3">
-    <div>
-      <a href="https://hexo.io" target="_blank" rel="nofollow noopener"><span>Hexo</span></a>
-      <i class="iconfont icon-love"></i>
-      <a href="https://github.com/fluid-dev/hexo-theme-fluid" target="_blank" rel="nofollow noopener">
-        <span>Fluid</span></a>
-    </div>
-    
-  <div class="statistics">
-    
-    
-
-    
-      
-        <!-- 不蒜子统计PV -->
-        <span id="busuanzi_container_site_pv" style="display: none">
-            总访问量 
-            <span id="busuanzi_value_site_pv"></span>
-             次
-          </span>
-      
-      
-        <!-- 不蒜子统计UV -->
-        <span id="busuanzi_container_site_uv" style="display: none">
-            总访客数 
-            <span id="busuanzi_value_site_uv"></span>
-             人
-          </span>
-      
-    
-  </div>
-
-
-    
-
-    
-  </div>
-</footer>
-
-<!-- SCRIPTS -->
-<script  src="https://cdn.staticfile.org/jquery/3.4.1/jquery.min.js" ></script>
-<script  src="https://cdn.staticfile.org/twitter-bootstrap/4.4.1/js/bootstrap.min.js" ></script>
-<script  src="/js/debouncer.js" ></script>
-<script  src="/js/main.js" ></script>
-
-<!-- Plugins -->
-
-
-  
-    <script  src="/js/lazyload.js" ></script>
-  
-
-
-
-  
-
-
-
-  <script defer src="https://cdn.staticfile.org/clipboard.js/2.0.6/clipboard.min.js" ></script>
-  <script  src="/js/clipboard-use.js" ></script>
-
-
-
-  <script defer src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" ></script>
-
-
-
-
-
-  <script  src="https://cdn.staticfile.org/tocbot/4.11.1/tocbot.min.js" ></script>
-  <script>
-    $(document).ready(function () {
-      var boardCtn = $('#board-ctn');
-      var boardTop = boardCtn.offset().top;
-
-      tocbot.init({
-        tocSelector: '#tocbot',
-        contentSelector: '#post-body',
-        headingSelector: 'h1,h2,h3,h4,h5,h6',
-        linkClass: 'tocbot-link',
-        activeLinkClass: 'tocbot-active-link',
-        listClass: 'tocbot-list',
-        isCollapsedClass: 'tocbot-is-collapsed',
-        collapsibleClass: 'tocbot-is-collapsible',
-        collapseDepth: 6,
-        scrollSmooth: true,
-        headingsOffset: -boardTop
-      });
-      if ($('.toc-list-item').length > 0) {
-        $('#toc').css('visibility', 'visible');
-      }
-    });
-  </script>
-
-
-
-  <script  src="https://cdn.staticfile.org/typed.js/2.0.11/typed.min.js" ></script>
-  <script>
-    var typed = new Typed('#subtitle', {
-      strings: [
-        '  ',
-        "在内网快速利用docker搭建DNS服务器&nbsp;",
-      ],
-      cursorChar: "_",
-      typeSpeed: 70,
-      loop: false,
-    });
-    typed.stop();
-    $(document).ready(function () {
-      $(".typed-cursor").addClass("h2");
-      typed.start();
-    });
-  </script>
-
-
-
-  <script  src="https://cdn.staticfile.org/anchor-js/4.2.2/anchor.min.js" ></script>
-  <script>
-    anchors.options = {
-      placement: "right",
-      visible: "hover",
-      
-    };
-    var el = "h1,h2,h3,h4,h5,h6".split(",");
-    var res = [];
-    for (item of el) {
-      res.push(".markdown-body > " + item)
+    if (true) { 
+      initData.requiredFields= ('nick,mail'.split(','))
     }
-    anchors.add(res.join(", "))
-  </script>
-
-
-
-  <script  src="/js/local-search.js" ></script>
-  <script>
-    var path = "/local-search.xml";
-    var inputArea = document.querySelector("#local-search-input");
-    inputArea.onclick = function () {
-      searchFunc(path, 'local-search-input', 'local-search-result');
-      this.onclick = null
+    
+    if (false) {
+      const otherData = false
+      initData = Object.assign({}, initData, otherData)
     }
-  </script>
+    
+    const valine = new Valine(initData)
+  }
 
+  if (typeof Valine === 'function') initValine() 
+  else getScript('https://cdn.jsdelivr.net/npm/valine/dist/Valine.min.js').then(initValine)
+}
 
-
-  <script  src="https://cdn.staticfile.org/fancybox/3.5.7/jquery.fancybox.min.js" ></script>
-  <link  rel="stylesheet" href="https://cdn.staticfile.org/fancybox/3.5.7/jquery.fancybox.min.css" />
-
-  <script>
-    $('#post img:not(.no-zoom img, img[no-zoom]), img[zoom]').each(
-      function () {
-        var element = document.createElement('a');
-        $(element).attr('data-fancybox', 'images');
-        $(element).attr('href', $(this).attr('src'));
-        $(this).wrap(element);
-      }
-    );
-  </script>
-
-
-
-
-
-
-
-  
-  
-    <script>
-      !function (e, t, a) {
-        function r() {
-          for (var e = 0; e < s.length; e++) s[e].alpha <= 0 ? (t.body.removeChild(s[e].el), s.splice(e, 1)) : (s[e].y--, s[e].scale += .004, s[e].alpha -= .013, s[e].el.style.cssText = "left:" + s[e].x + "px;top:" + s[e].y + "px;opacity:" + s[e].alpha + ";transform:scale(" + s[e].scale + "," + s[e].scale + ") rotate(45deg);background:" + s[e].color + ";z-index:99999");
-          requestAnimationFrame(r)
-        }
-
-        function n() {
-          var t = "function" == typeof e.onclick && e.onclick;
-          e.onclick = function (e) {
-            t && t(), o(e)
-          }
-        }
-
-        function o(e) {
-          var a = t.createElement("div");
-          a.className = "heart", s.push({
-            el: a,
-            x: e.clientX - 5,
-            y: e.clientY - 5,
-            scale: 1,
-            alpha: 1,
-            color: c()
-          }), t.body.appendChild(a)
-        }
-
-        function i(e) {
-          var a = t.createElement("style");
-          a.type = "text/css";
-          try {
-            a.appendChild(t.createTextNode(e))
-          } catch (t) {
-            a.styleSheet.cssText = e
-          }
-          t.getElementsByTagName("head")[0].appendChild(a)
-        }
-
-        function c() {
-          return "rgb(" + ~~(255 * Math.random()) + "," + ~~(255 * Math.random()) + "," + ~~(255 * Math.random()) + ")"
-        }
-
-        var s = [];
-        e.requestAnimationFrame = e.requestAnimationFrame || e.webkitRequestAnimationFrame || e.mozRequestAnimationFrame || e.oRequestAnimationFrame || e.msRequestAnimationFrame || function (e) {
-          setTimeout(e, 1e3 / 60)
-        }, i(".heart{width: 10px;height: 10px;position: fixed;background: #f00;transform: rotate(45deg);-webkit-transform: rotate(45deg);-moz-transform: rotate(45deg);}.heart:after,.heart:before{content: '';width: inherit;height: inherit;background: inherit;border-radius: 50%;-webkit-border-radius: 50%;-moz-border-radius: 50%;position: fixed;}.heart:after{top: -5px;}.heart:before{left: -5px;}"), n(), r()
-      }(window, document);
-    </script>
-  
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-</body>
-</html>
+if ('Valine' === 'Valine' || !true) {
+  if (true) btf.loadComment(document.querySelector('#vcomment'),loadValine)
+  else setTimeout(() => loadValine(), 0)
+} else {
+  function loadOtherComment () {
+    loadValine()
+  }
+}</script><script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div><script defer="defer" id="ribbon" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1/dist/canvas-ribbon.min.js" size="150" alpha="0.6" zIndex="-1" mobile="false" data-click="false"></script></div></body></html>

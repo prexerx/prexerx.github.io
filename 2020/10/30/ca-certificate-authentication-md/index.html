@@ -1,259 +1,175 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width,initial-scale=1"><title>你想通过本地构建CA来颁发证书么？ | 妖灵山</title><meta name="keywords" content="CA,证书,鉴权"><meta name="author" content="prexer"><meta name="copyright" content="prexer"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta http-equiv="Cache-Control" content="no-transform"><meta http-equiv="Cache-Control" content="no-siteapp"><meta name="description" content="进来看看我们如何在本地构建CA并颁发证书吧！">
+<meta property="og:type" content="article">
+<meta property="og:title" content="你想通过本地构建CA来颁发证书么？">
+<meta property="og:url" content="http://example.com/2020/10/30/ca-certificate-authentication-md/index.html">
+<meta property="og:site_name" content="妖灵山">
+<meta property="og:description" content="进来看看我们如何在本地构建CA并颁发证书吧！">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://example.com/images/blog-images/ca_logo.png">
+<meta property="article:published_time" content="2020-10-30T09:01:12.000Z">
+<meta property="article:modified_time" content="2020-11-28T14:24:23.278Z">
+<meta property="article:author" content="prexer">
+<meta property="article:tag" content="CA">
+<meta property="article:tag" content="证书">
+<meta property="article:tag" content="鉴权">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://example.com/images/blog-images/ca_logo.png"><link rel="shortcut icon" href="/img/favicon.png"><link rel="canonical" href="http://example.com/2020/10/30/ca-certificate-authentication-md/"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/node-snackbar/dist/snackbar.min.css"><script>var GLOBAL_CONFIG = { 
+  root: '/',
+  algolia: undefined,
+  localSearch: {"path":"search.xml","languages":{"hits_empty":"找不到您查询的内容：${query}"}},
+  translate: undefined,
+  noticeOutdate: undefined,
+  highlight: {"plugin":"highlighjs","highlightCopy":false,"highlightLang":false},
+  copy: {
+    success: '复制成功',
+    error: '复制错误',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '天',
+  date_suffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: {"limitCount":50,"languages":{"author":"作者: prexer","link":"链接: ","source":"来源: 妖灵山","info":"著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。"}},
+  ClickShowText: undefined,
+  lightbox: 'fancybox',
+  Snackbar: {"chs_to_cht":"你已切换为繁体","cht_to_chs":"你已切换为简体","day_to_night":"你已切换为深色模式","night_to_day":"你已切换为浅色模式","bgLight":"#49b1f5","bgDark":"#121212","position":"bottom-left"},
+  source: {
+    jQuery: 'https://cdn.jsdelivr.net/npm/jquery@latest/dist/jquery.min.js',
+    justifiedGallery: {
+      js: 'https://cdn.jsdelivr.net/npm/justifiedGallery/dist/js/jquery.justifiedGallery.min.js',
+      css: 'https://cdn.jsdelivr.net/npm/justifiedGallery/dist/css/justifiedGallery.min.css'
+    },
+    fancybox: {
+      js: 'https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@latest/dist/jquery.fancybox.min.js',
+      css: 'https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@latest/dist/jquery.fancybox.min.css'
+    }
+  },
+  isPhotoFigcaption: true,
+  islazyload: false,
+  isanchor: false
+};
 
+var saveToLocal = {
+  set: function setWithExpiry(key, value, ttl) {
+    const now = new Date()
+    const expiryDay = ttl * 86400000
+    const item = {
+      value: value,
+      expiry: now.getTime() + expiryDay,
+    }
+    localStorage.setItem(key, JSON.stringify(item))
+  },
 
-<!DOCTYPE html>
-<html lang="zh-CN" data-default-color-scheme=&#34;auto&#34;>
+  get: function getWithExpiry(key) {
+    const itemStr = localStorage.getItem(key)
 
+    if (!itemStr) {
+      return undefined
+    }
+    const item = JSON.parse(itemStr)
+    const now = new Date()
 
+    if (now.getTime() > item.expiry) {
+      localStorage.removeItem(key)
+      return undefined
+    }
+    return item.value
+  }
+}
 
-<head>
-  <meta charset="UTF-8">
-  <link rel="apple-touch-icon" sizes="76x76" href="/img/favicon.png">
-  <link rel="icon" type="image/png" href="/img/favicon.png">
-  <meta name="viewport"
-        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
-  <meta http-equiv="x-ua-compatible" content="ie=edge">
-  
-  <meta name="theme-color" content="#2f4154">
-  <meta name="description" content="">
-  <meta name="author" content="prexer">
-  <meta name="keywords" content="">
-  <title>你想通过本地构建CA来颁发证书么？ - Prexer&#39;s Blog</title>
+// https://stackoverflow.com/questions/16839698/jquery-getscript-alternative-in-native-javascript
+const getScript = url => new Promise((resolve, reject) => {
+  const script = document.createElement('script')
+  script.src = url
+  script.async = true
+  script.onerror = reject
+  script.onload = script.onreadystatechange = function() {
+    const loadState = this.readyState
+    if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+    script.onload = script.onreadystatechange = null
+    resolve()
+  }
+  document.head.appendChild(script)
+})</script><script id="config_change">var GLOBAL_CONFIG_SITE = { 
+  isPost: true,
+  isHome: false,
+  isHighlightShrink: false,
+  isToc: true,
+  postUpdate: '2020-11-28 14:24:23'
+}</script><noscript><style type="text/css">
+  #nav {
+    opacity: 1
+  }
+  .justified-gallery img {
+    opacity: 1
+  }
 
-  <link  rel="stylesheet" href="https://cdn.staticfile.org/twitter-bootstrap/4.4.1/css/bootstrap.min.css" />
-
-
-  <link  rel="stylesheet" href="https://cdn.staticfile.org/github-markdown-css/4.0.0/github-markdown.min.css" />
-  <link  rel="stylesheet" href="/lib/hint/hint.min.css" />
-
-  
-    
-    
-      
-      <link  rel="stylesheet" href="https://cdn.staticfile.org/highlight.js/10.0.0/styles/gruvbox-dark.min.css" />
-    
-  
-
-  
-
-
-<!-- 主题依赖的图标库，不要自行修改 -->
-
-<link rel="stylesheet" href="//at.alicdn.com/t/font_1749284_pf9vaxs7x7b.css">
-
-
-
-<link rel="stylesheet" href="//at.alicdn.com/t/font_1736178_kmeydafke9r.css">
-
-
-<link  rel="stylesheet" href="/css/main.css" />
-
-<!-- 自定义样式保持在最底部 -->
-
-
-  <script  src="/js/utils.js" ></script>
-  <script  src="/js/color-schema.js" ></script>
-<meta name="generator" content="Hexo 5.2.0"></head>
-
-
-<body>
-  <header style="height: 70vh;">
-    <nav id="navbar" class="navbar fixed-top  navbar-expand-lg navbar-dark scrolling-navbar">
-  <div class="container">
-    <a class="navbar-brand"
-       href="/">&nbsp;<strong>妖灵山</strong>&nbsp;</a>
-
-    <button id="navbar-toggler-btn" class="navbar-toggler" type="button" data-toggle="collapse"
-            data-target="#navbarSupportedContent"
-            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
-      <div class="animated-icon"><span></span><span></span><span></span></div>
-    </button>
-
-    <!-- Collapsible content -->
-    <div class="collapse navbar-collapse" id="navbarSupportedContent">
-      <ul class="navbar-nav ml-auto text-center">
-        
-          
-          
-          
-          
-            <li class="nav-item">
-              <a class="nav-link" href="/">
-                <i class="iconfont icon-home-fill"></i>
-                首页
-              </a>
-            </li>
-          
-        
-          
-          
-          
-          
-            <li class="nav-item">
-              <a class="nav-link" href="/archives/">
-                <i class="iconfont icon-archive-fill"></i>
-                归档
-              </a>
-            </li>
-          
-        
-          
-          
-          
-          
-            <li class="nav-item">
-              <a class="nav-link" href="/categories/">
-                <i class="iconfont icon-category-fill"></i>
-                分类
-              </a>
-            </li>
-          
-        
-          
-          
-          
-          
-            <li class="nav-item">
-              <a class="nav-link" href="/tags/">
-                <i class="iconfont icon-tags-fill"></i>
-                标签
-              </a>
-            </li>
-          
-        
-          
-          
-          
-          
-            <li class="nav-item">
-              <a class="nav-link" href="/about/">
-                <i class="iconfont icon-user-fill"></i>
-                关于
-              </a>
-            </li>
-          
-        
-          
-          
-          
-          
-            <li class="nav-item">
-              <a class="nav-link" href="/links/">
-                <i class="iconfont icon-link-fill"></i>
-                友链
-              </a>
-            </li>
-          
-        
-        
-          <li class="nav-item" id="search-btn">
-            <a class="nav-link" data-toggle="modal" data-target="#modalSearch">&nbsp;<i
-                class="iconfont icon-search"></i>&nbsp;</a>
-          </li>
-        
-        
-          <li class="nav-item" id="color-toggle-btn">
-            <a class="nav-link" href="javascript:">&nbsp;<i
-                class="iconfont icon-dark" id="color-toggle-icon"></i>&nbsp;</a>
-          </li>
-        
-      </ul>
-    </div>
-  </div>
-</nav>
-
-    <div class="banner intro-2" id="background" parallax=true
-         style="background: url('/img/site-fixed-images/dead-cells-01.jpg') no-repeat center center;
-           background-size: cover;">
-      <div class="full-bg-img">
-        <div class="mask flex-center" style="background-color: rgba(0, 0, 0, 0.3)">
-          <div class="container page-header text-center fade-in-up">
-            <span class="h2" id="subtitle">
-              
-            </span>
-
-            
-              <div class="mt-3">
-  
-    <span class="post-meta mr-2">
-      <i class="iconfont icon-author" aria-hidden="true"></i>
-      prexer
-    </span>
-  
-  
-    <span class="post-meta">
-      <i class="iconfont icon-date-fill" aria-hidden="true"></i>
-      <time datetime="2020-10-30 09:01" pubdate>
-        2020年10月30日 上午
-      </time>
-    </span>
-  
+  #recent-posts time,
+  #post-meta time {
+    display: inline !important
+  }
+</style></noscript><script>(function () {  window.activateDarkMode = function () {
+    document.documentElement.setAttribute('data-theme', 'dark')
+    if (document.querySelector('meta[name="theme-color"]') !== null) {
+      document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+    }
+  }
+  window.activateLightMode = function () {
+    document.documentElement.setAttribute('data-theme', 'light')
+   if (document.querySelector('meta[name="theme-color"]') !== null) {
+      document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+    }
+  }
+  const autoChangeMode = '2'
+  const t = saveToLocal.get('theme')
+  if (autoChangeMode === '1') {
+    const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches
+    const isLightMode = window.matchMedia('(prefers-color-scheme: light)').matches
+    const isNotSpecified = window.matchMedia('(prefers-color-scheme: no-preference)').matches
+    const hasNoSupport = !isDarkMode && !isLightMode && !isNotSpecified
+    if (t === undefined) {
+      if (isLightMode) activateLightMode()
+      else if (isDarkMode) activateDarkMode()
+      else if (isNotSpecified || hasNoSupport) {
+        const now = new Date()
+        const hour = now.getHours()
+        const isNight = hour <= 6 || hour >= 18
+        isNight ? activateDarkMode() : activateLightMode()
+      }
+      window.matchMedia('(prefers-color-scheme: dark)').addListener(function (e) {
+        if (saveToLocal.get('theme') === undefined) {
+          e.matches ? activateDarkMode() : activateLightMode()
+        }
+      })
+    } else if (t === 'light') activateLightMode()
+    else activateDarkMode()
+  } else if (autoChangeMode === '2') {
+    const now = new Date()
+    const hour = now.getHours()
+    const isNight = hour <= 6 || hour >= 18
+    if (t === undefined) isNight ? activateDarkMode() : activateLightMode()
+    else if (t === 'light') activateLightMode()
+    else activateDarkMode()
+  } else {
+    if (t === 'dark') activateDarkMode()
+    else if (t === 'light') activateLightMode()
+  }const asideStatus = saveToLocal.get('aside-status')
+if (asideStatus !== undefined) {
+   if (asideStatus === 'hide') {
+     document.documentElement.classList.add('hide-aside')
+   } else {
+     document.documentElement.classList.remove('hide-aside')
+   }
+}})()</script><meta name="generator" content="Hexo 5.2.0"></head><body><div id="loading-box"><div class="loading-left-bg"></div><div class="loading-right-bg"></div><div class="spinner-box"><div class="configure-border-1"><div class="configure-core"></div></div><div class="configure-border-2"><div class="configure-core"></div></div><div class="loading-word">加载中...</div></div></div><div id="web_bg"></div><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="author-avatar"><img class="avatar-img" src="/images/site/header.jpg" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="site-data"><div class="data-item is-center"><div class="data-item-link"><a href="/archives/"><div class="headline">文章</div><div class="length-num">5</div></a></div></div><div class="data-item is-center"><div class="data-item-link"><a href="/tags/"><div class="headline">标签</div><div class="length-num">15</div></a></div></div><div class="data-item is-center"><div class="data-item-link"><a href="/categories/"><div class="headline">分类</div><div class="length-num">7</div></a></div></div></div><hr/><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 时间轴</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div><div class="menus_item"><a class="site-page" href="/talktalk/"><i class="fa-fw fas fa-comment-dots"></i><span> 留言板</span></a></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fas fa-heart"></i><span> 关于</span></a></div></div></div></div><div id="body-wrap"><header class="post-bg" id="page-header" style="background-image: url(/images/site/index_home_top.jpg)"><nav id="nav"><span id="blog_name"><a id="site-name" href="/">妖灵山</a></span><div id="menus"><div id="search-button"><a class="site-page social-icon search"><i class="fas fa-search fa-fw"></i><span> 搜索</span></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 时间轴</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div><div class="menus_item"><a class="site-page" href="/talktalk/"><i class="fa-fw fas fa-comment-dots"></i><span> 留言板</span></a></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fas fa-heart"></i><span> 关于</span></a></div></div><div id="toggle-menu"><a class="site-page"><i class="fas fa-bars fa-fw"></i></a></div></div></nav><div id="post-info"><h1 class="post-title">你想通过本地构建CA来颁发证书么？</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2020-10-30T09:01:12.000Z" title="发表于 2020-10-30 09:01:12">2020-10-30</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2020-11-28T14:24:23.278Z" title="更新于 2020-11-28 14:24:23">2020-11-28</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/CA/">CA</a></span></div><div class="meta-secondline"> <span class="post-meta-separator">|</span><span class="post-meta-wordcount"><i class="far fa-file-word fa-fw post-meta-icon"></i><span class="post-meta-label">字数总计:</span><span class="word-count">3.7k</span><span class="post-meta-separator">|</span><i class="far fa-clock fa-fw post-meta-icon"></i><span class="post-meta-label">阅读时长:</span><span>15分钟</span></span><span class="post-meta-separator">|</span><span class="post-meta-pv-cv"><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">阅读量:</span><span id="busuanzi_value_page_pv"></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="post-content" id="article-container"><div class="note light flat"><p>进来看看我们如何在本地构建CA并颁发证书吧！</p>
 </div>
-
-<div class="mt-1">
-  
-    
-    <span class="post-meta mr-2">
-      <i class="iconfont icon-chart"></i>
-      3.7k 字
-    </span>
-  
-
-  
-    
-    <span class="post-meta mr-2">
-      <i class="iconfont icon-clock-fill"></i>
-      
-      
-      52
-       分钟
-    </span>
-  
-
-  
-  
-    
-      <!-- 不蒜子统计文章PV -->
-      <span id="busuanzi_container_page_pv" style="display: none">
-        <i class="iconfont icon-eye" aria-hidden="true"></i>
-        <span id="busuanzi_value_page_pv"></span> 次
-      </span>
-    
-  
-</div>
-
-            
-          </div>
-
-          
-        </div>
-      </div>
-    </div>
-  </header>
-
-  <main>
-    
-      
-
-<div class="container-fluid">
-  <div class="row">
-    <div class="d-none d-lg-block col-lg-2"></div>
-    <div class="col-lg-8 nopadding-md">
-      <div class="container nopadding-md" id="board-ctn">
-        <div class="py-5" id="board">
-          <article class="post-content mx-auto" id="post">
-            <!-- SEO header -->
-            <h1 style="display: none">你想通过本地构建CA来颁发证书么？</h1>
-            
-              <p class="note note-info">
-                
-                  本文最后更新于：2020年11月1日 凌晨
-                
-              </p>
-            
-            <div class="markdown-body" id="post-body">
-              <div class="note note-light">
-            <p>进来看看我们如何在本地构建CA并颁发证书吧！</p>
-          </div>
 
 <a id="more"></a>
 
@@ -262,20 +178,16 @@
 <p>好在本文的所有内容均有实践验证，这让笔者在操刀的时候踏实不少。</p>
 <p>书归正传，看看如何使用自建CA完成证书的签署和颁发吧。</p>
 <h2 id="可复现的系统环境"><a href="#可复现的系统环境" class="headerlink" title="可复现的系统环境"></a>可复现的系统环境</h2><p>操作系统套件版本信息：</p>
-<div class="hljs"><pre><code class="hljs text">prexer $ cat /proc/version
-Linux version 4.18.0-25-generic (buildd@lcy01-amd64-025) (gcc version 8.3.0 (Ubuntu 8.3.0-6ubuntu1~18.10.1)) #26-Ubuntu SMP Mon Jun 24 09:32:08 UTC 2019</code></pre></div>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">prexer $ cat /proc/version</span><br><span class="line">Linux version 4.18.0-25-generic (buildd@lcy01-amd64-025) (gcc version 8.3.0 (Ubuntu 8.3.0-6ubuntu1~18.10.1)) #26-Ubuntu SMP Mon Jun 24 09:32:08 UTC 2019</span><br></pre></td></tr></table></figure>
 
 <p>openssl工具版本信息：</p>
-<div class="hljs"><pre><code class="hljs text">prexer $ openssl version
-OpenSSL 1.1.1  11 Sep 2018</code></pre></div>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">prexer $ openssl version</span><br><span class="line">OpenSSL 1.1.1  11 Sep 2018</span><br></pre></td></tr></table></figure>
 
 <p>python3版本信息：</p>
-<div class="hljs"><pre><code class="hljs text">prexer $ python3 --version
-Python 3.8.5</code></pre></div>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">prexer $ python3 --version</span><br><span class="line">Python 3.8.5</span><br></pre></td></tr></table></figure>
 
 <p>docker版本信息：</p>
-<div class="hljs"><pre><code class="hljs text">prexer $ docker --version
-Docker version 18.09.7, build 2d0083d</code></pre></div>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">prexer $ docker --version</span><br><span class="line">Docker version 18.09.7, build 2d0083d</span><br></pre></td></tr></table></figure>
 
 <p>这里只是笔者的环境，并不是说你必须一样才能通过，只不过在这个版本上，笔者是经过充分验证的。</p>
 <h2 id="CA证书涉及的对象有哪些？"><a href="#CA证书涉及的对象有哪些？" class="headerlink" title="CA证书涉及的对象有哪些？"></a>CA证书涉及的对象有哪些？</h2><p>一一列举：</p>
@@ -302,58 +214,16 @@ Docker version 18.09.7, build 2d0083d</code></pre></div>
 </li>
 </ul>
 <p>后续生成文件树的概览：</p>
-<div class="hljs"><pre><code class="hljs shell">prexer $ tree CA/ CA_demo/
-CA/
-├── ca-key.pem
-├── ca.pem
-├── ca.srl
-├── client-cert.pem
-├── client.csr
-├── client-key.pem
-├── client.p12
-├── extfile.conf
-├── server-cert.pem
-├── server.csr
-└── server-key.pem
-CA_demo/
-├── https-home
-│   └── index.html
-└── nginx-conf
-    └── default.conf
-
-2 directories, 13 files</code></pre></div>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">prexer $ tree CA/ CA_demo/</span><br><span class="line">CA/</span><br><span class="line">├── ca-key.pem</span><br><span class="line">├── ca.pem</span><br><span class="line">├── ca.srl</span><br><span class="line">├── client-cert.pem</span><br><span class="line">├── client.csr</span><br><span class="line">├── client-key.pem</span><br><span class="line">├── client.p12</span><br><span class="line">├── extfile.conf</span><br><span class="line">├── server-cert.pem</span><br><span class="line">├── server.csr</span><br><span class="line">└── server-key.pem</span><br><span class="line">CA_demo/</span><br><span class="line">├── https-home</span><br><span class="line">│   └── index.html</span><br><span class="line">└── nginx-conf</span><br><span class="line">    └── default.conf</span><br><span class="line"></span><br><span class="line">2 directories, 13 files</span><br></pre></td></tr></table></figure>
 
 <h2 id="建立一个证书授权中心玩玩"><a href="#建立一个证书授权中心玩玩" class="headerlink" title="建立一个证书授权中心玩玩"></a>建立一个证书授权中心玩玩</h2><p>证书授权中心当然不能随便建立，这里说的建立是一个抽象层面的说法，本质上我们使用openssl工具建立一个本地的虚假证书机构。</p>
 <p>虽然它颁发的不是官方的授权证书，但对于实际的应用来说依旧有用。</p>
 <p>后文证书的私钥/公钥均采用<code>2048字节</code>，如果有需要可以提升。</p>
 <p>简单一句完成建立：</p>
-<div class="hljs"><pre><code class="hljs text">prexer $ sudo openssl genrsa -des3 -out ca-key.pem
-Generating RSA private key, 2048 bit long modulus (2 primes)
-...................................................................+++++
-......................+++++
-e is 65537 (0x010001)
-Enter pass phrase for ca-key.pem:
-Verifying - Enter pass phrase for ca-key.pem:</code></pre></div>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">prexer $ sudo openssl genrsa -des3 -out ca-key.pem</span><br><span class="line">Generating RSA private key, 2048 bit long modulus (2 primes)</span><br><span class="line">...................................................................+++++</span><br><span class="line">......................+++++</span><br><span class="line">e is 65537 (0x010001)</span><br><span class="line">Enter pass phrase for ca-key.pem:</span><br><span class="line">Verifying - Enter pass phrase for ca-key.pem:</span><br></pre></td></tr></table></figure>
 <p>这里的<code>ca-key.pem</code>就是你本地CA授权机构的密钥，你就当他是授权机构。<br>执行的时候需要你输入密码，这个密码要记住，不仅后续的指令还要依赖它，没准以后其他情况也要用到哦。</p>
 <h2 id="颁发认证机构的证书"><a href="#颁发认证机构的证书" class="headerlink" title="颁发认证机构的证书"></a>颁发认证机构的证书</h2><p>使用前文创建的证书机构密钥来建立一个代表机构的证书，当然也很简单：</p>
-<div class="hljs"><pre><code class="hljs text">prexer $ sudo openssl req -new -x509 -days 365 -key ca-key.pem -out ca.pem
-Enter pass phrase for ca-key.pem:
-Can&#x27;t load /home/wei/.rnd into RNG
-140197562365120:error:2406F079:random number generator:RAND_load_file:Cannot open file:../crypto/rand/randfile.c:88:Filename=/home/wei/.rnd
-You are about to be asked to enter information that will be incorporated
-into your certificate request.
-What you are about to enter is what is called a Distinguished Name or a DN.
-There are quite a few fields but you can leave some blank
-For some fields there will be a default value,
-If you enter &#x27;.&#x27;, the field will be left blank.
------
-Country Name (2 letter code) [AU]:
-State or Province Name (full name) [Some-State]:
-Locality Name (eg, city) []:
-Organization Name (eg, company) [Internet Widgits Pty Ltd]:
-Organizational Unit Name (eg, section) []:
-Common Name (e.g. server FQDN or YOUR name) []:prexer.gitee.io
-Email Address []:</code></pre></div>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">prexer $ sudo openssl req -new -x509 -days 365 -key ca-key.pem -out ca.pem</span><br><span class="line">Enter pass phrase for ca-key.pem:</span><br><span class="line">Can&#x27;t load /home/wei/.rnd into RNG</span><br><span class="line">140197562365120:error:2406F079:random number generator:RAND_load_file:Cannot open file:../crypto/rand/randfile.c:88:Filename=/home/wei/.rnd</span><br><span class="line">You are about to be asked to enter information that will be incorporated</span><br><span class="line">into your certificate request.</span><br><span class="line">What you are about to enter is what is called a Distinguished Name or a DN.</span><br><span class="line">There are quite a few fields but you can leave some blank</span><br><span class="line">For some fields there will be a default value,</span><br><span class="line">If you enter &#x27;.&#x27;, the field will be left blank.</span><br><span class="line">-----</span><br><span class="line">Country Name (2 letter code) [AU]:</span><br><span class="line">State or Province Name (full name) [Some-State]:</span><br><span class="line">Locality Name (eg, city) []:</span><br><span class="line">Organization Name (eg, company) [Internet Widgits Pty Ltd]:</span><br><span class="line">Organizational Unit Name (eg, section) []:</span><br><span class="line">Common Name (e.g. server FQDN or YOUR name) []:prexer.gitee.io</span><br><span class="line">Email Address []:</span><br></pre></td></tr></table></figure>
 
 <p>相关参数请自行到搜索引擎查询，讲解的文章成片飘落…<br>这里还要说明两点：</p>
 <ol>
@@ -362,129 +232,43 @@ Email Address []:</code></pre></div>
 </ol>
 <h2 id="创建用于服务端的证书签名请求和密钥"><a href="#创建用于服务端的证书签名请求和密钥" class="headerlink" title="创建用于服务端的证书签名请求和密钥"></a>创建用于服务端的证书签名请求和密钥</h2><p>在正式颁发指定服务端证书的时候，需要一个证书签名请求，而这个证书的签名请求还需要你为服务器生成一个服务端的密钥文件。</p>
 <p>那么，我们先生成一个服务端的密钥文件：</p>
-<div class="hljs"><pre><code class="hljs text">prexer $ sudo openssl genrsa -des3 -out server-key.pem
-Generating RSA private key, 2048 bit long modulus (2 primes)
-.........+++++
-.............................................+++++
-e is 65537 (0x010001)
-Enter pass phrase for server-key.pem:
-Verifying - Enter pass phrase for server-key.pem:</code></pre></div>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">prexer $ sudo openssl genrsa -des3 -out server-key.pem</span><br><span class="line">Generating RSA private key, 2048 bit long modulus (2 primes)</span><br><span class="line">.........+++++</span><br><span class="line">.............................................+++++</span><br><span class="line">e is 65537 (0x010001)</span><br><span class="line">Enter pass phrase for server-key.pem:</span><br><span class="line">Verifying - Enter pass phrase for server-key.pem:</span><br></pre></td></tr></table></figure>
 <p>没错，他和生成虚假认证机构的密钥是相似的，过程中需要你为它也设置一个密码，这个密码后续我们会删除，毕竟大部分应用场景都不需要密码完成认证。</p>
 <p>接下来，用上面的服务器密钥来生成一个证书签名请求：</p>
-<div class="hljs"><pre><code class="hljs text">prexer $ sudo openssl req -new -key server-key.pem -out server.csr
-Enter pass phrase for server-key.pem:
-Can&#x27;t load /home/wei/.rnd into RNG
-139737719624896:error:2406F079:random number generator:RAND_load_file:Cannot open file:../crypto/rand/randfile.c:88:Filename=/home/wei/.rnd
-You are about to be asked to enter information that will be incorporated
-into your certificate request.
-What you are about to enter is what is called a Distinguished Name or a DN.
-There are quite a few fields but you can leave some blank
-For some fields there will be a default value,
-If you enter &#x27;.&#x27;, the field will be left blank.
------
-Country Name (2 letter code) [AU]:
-State or Province Name (full name) [Some-State]:
-Locality Name (eg, city) []:
-Organization Name (eg, company) [Internet Widgits Pty Ltd]:
-Organizational Unit Name (eg, section) []:
-Common Name (e.g. server FQDN or YOUR name) []:*
-Email Address []:
-
-Please enter the following &#x27;extra&#x27; attributes
-to be sent with your certificate request
-A challenge password []:
-An optional company name []:</code></pre></div>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line">prexer $ sudo openssl req -new -key server-key.pem -out server.csr</span><br><span class="line">Enter pass phrase for server-key.pem:</span><br><span class="line">Can&#x27;t load /home/wei/.rnd into RNG</span><br><span class="line">139737719624896:error:2406F079:random number generator:RAND_load_file:Cannot open file:../crypto/rand/randfile.c:88:Filename=/home/wei/.rnd</span><br><span class="line">You are about to be asked to enter information that will be incorporated</span><br><span class="line">into your certificate request.</span><br><span class="line">What you are about to enter is what is called a Distinguished Name or a DN.</span><br><span class="line">There are quite a few fields but you can leave some blank</span><br><span class="line">For some fields there will be a default value,</span><br><span class="line">If you enter &#x27;.&#x27;, the field will be left blank.</span><br><span class="line">-----</span><br><span class="line">Country Name (2 letter code) [AU]:</span><br><span class="line">State or Province Name (full name) [Some-State]:</span><br><span class="line">Locality Name (eg, city) []:</span><br><span class="line">Organization Name (eg, company) [Internet Widgits Pty Ltd]:</span><br><span class="line">Organizational Unit Name (eg, section) []:</span><br><span class="line">Common Name (e.g. server FQDN or YOUR name) []:*</span><br><span class="line">Email Address []:</span><br><span class="line"></span><br><span class="line">Please enter the following &#x27;extra&#x27; attributes</span><br><span class="line">to be sent with your certificate request</span><br><span class="line">A challenge password []:</span><br><span class="line">An optional company name []:</span><br></pre></td></tr></table></figure>
 <p>这里除了要输入密码，还要重点注意<code>FQDN</code>这个选项，这里设置为<code>*</code>是表示允许该证书在任意的一台服务器上都可以使用，当然，你也可以按照你的需求指定一个有效的服务器，如：prexer.example.org</p>
 <h2 id="正式生成服务端的证书"><a href="#正式生成服务端的证书" class="headerlink" title="正式生成服务端的证书"></a>正式生成服务端的证书</h2><p>有了请求，向认证机构申请证书还是比较简单的，不过在请求前，要先生成一个<code>srl</code>文件：</p>
-<div class="hljs"><pre><code class="hljs text">prexer $ echo 01 &gt; $PWD/ca.srl</code></pre></div>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">prexer $ echo 01 &gt; $PWD/ca.srl</span><br></pre></td></tr></table></figure>
 
 <p>开始颁发证书吧：</p>
-<div class="hljs"><pre><code class="hljs text">prexer $ sudo openssl x509 -req -days 365 -in server.csr -CA ca.pem -CAkey ca-key.pem -out server-cert.pem
-Signature ok
-subject=C = AU, ST = Some-State, O = Internet Widgits Pty Ltd, CN = *
-Getting CA Private Key
-Enter pass phrase for ca-key.pem:</code></pre></div>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">prexer $ sudo openssl x509 -req -days 365 -in server.csr -CA ca.pem -CAkey ca-key.pem -out server-cert.pem</span><br><span class="line">Signature ok</span><br><span class="line">subject=C = AU, ST = Some-State, O = Internet Widgits Pty Ltd, CN = *</span><br><span class="line">Getting CA Private Key</span><br><span class="line">Enter pass phrase for ca-key.pem:</span><br></pre></td></tr></table></figure>
 
 <p>密码什么的相信你已经熟练的使用了，接下来完成一个实用的步骤，移除服务端的密钥密码：</p>
-<div class="hljs"><pre><code class="hljs text">prexer $ sudo openssl rsa -in server-key.pem -out server-key.pem
-Enter pass phrase for server-key.pem:
-writing RSA key</code></pre></div>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">prexer $ sudo openssl rsa -in server-key.pem -out server-key.pem</span><br><span class="line">Enter pass phrase for server-key.pem:</span><br><span class="line">writing RSA key</span><br></pre></td></tr></table></figure>
 
 <p>如果你还是没安全感，那就让文件的权限跟窄一些：</p>
-<div class="hljs"><pre><code class="hljs text">sudo chmod 0600 *.pem</code></pre></div>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sudo chmod 0600 *.pem</span><br></pre></td></tr></table></figure>
 
 <p>这一步骤你可以根据需求执行，到现在我们拥有的文件试图应该是:</p>
-<div class="hljs"><pre><code class="hljs text">prexer $ ls -l
-total 24
--rw------- 1 root root 1743 10月 30 23:06 ca-key.pem
--rw------- 1 root root 1318 10月 30 23:12 ca.pem
--rw-r--r-- 1 wei  wei     3 10月 30 23:32 ca.srl
--rw------- 1 root root 1151 10月 30 23:32 server-cert.pem
--rw-r--r-- 1 root root  972 10月 30 23:24 server.csr
--rw------- 1 root root 1675 10月 30 23:36 server-key.pem</code></pre></div>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">prexer $ ls -l</span><br><span class="line">total 24</span><br><span class="line">-rw------- 1 root root 1743 10月 30 23:06 ca-key.pem</span><br><span class="line">-rw------- 1 root root 1318 10月 30 23:12 ca.pem</span><br><span class="line">-rw-r--r-- 1 wei  wei     3 10月 30 23:32 ca.srl</span><br><span class="line">-rw------- 1 root root 1151 10月 30 23:32 server-cert.pem</span><br><span class="line">-rw-r--r-- 1 root root  972 10月 30 23:24 server.csr</span><br><span class="line">-rw------- 1 root root 1675 10月 30 23:36 server-key.pem</span><br></pre></td></tr></table></figure>
 
 <h2 id="创建客户端的密钥和证书"><a href="#创建客户端的密钥和证书" class="headerlink" title="创建客户端的密钥和证书"></a>创建客户端的密钥和证书</h2><p>操作方法和服务器端相似，先生成客户端密钥：</p>
-<div class="hljs"><pre><code class="hljs text">prexer $ sudo openssl genrsa -des3 -out client-key.pem
-Generating RSA private key, 2048 bit long modulus (2 primes)
-.............+++++
-...................................+++++
-e is 65537 (0x010001)
-Enter pass phrase for client-key.pem:
-Verifying - Enter pass phrase for client-key.pem:</code></pre></div>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">prexer $ sudo openssl genrsa -des3 -out client-key.pem</span><br><span class="line">Generating RSA private key, 2048 bit long modulus (2 primes)</span><br><span class="line">.............+++++</span><br><span class="line">...................................+++++</span><br><span class="line">e is 65537 (0x010001)</span><br><span class="line">Enter pass phrase for client-key.pem:</span><br><span class="line">Verifying - Enter pass phrase for client-key.pem:</span><br></pre></td></tr></table></figure>
 <p>这个阶段同样要设置一个临时的密码，后续会删除。</p>
 <p>接下来创建一个客户端证书签名请求，和前文一样，是一个CSR文件：</p>
-<div class="hljs"><pre><code class="hljs text">prexer $ sudo openssl req -new -key client-key.pem -out client.csr
-Enter pass phrase for client-key.pem:
-Can&#x27;t load /home/wei/.rnd into RNG
-140471898436800:error:2406F079:random number generator:RAND_load_file:Cannot open file:../crypto/rand/randfile.c:88:Filename=/home/wei/.rnd
-You are about to be asked to enter information that will be incorporated
-into your certificate request.
-What you are about to enter is what is called a Distinguished Name or a DN.
-There are quite a few fields but you can leave some blank
-For some fields there will be a default value,
-If you enter &#x27;.&#x27;, the field will be left blank.
------
-Country Name (2 letter code) [AU]:
-State or Province Name (full name) [Some-State]:
-Locality Name (eg, city) []:
-Organization Name (eg, company) [Internet Widgits Pty Ltd]:
-Organizational Unit Name (eg, section) []:
-Common Name (e.g. server FQDN or YOUR name) []:
-Email Address []:
-
-Please enter the following &#x27;extra&#x27; attributes
-to be sent with your certificate request
-A challenge password []:
-An optional company name []:</code></pre></div>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line">prexer $ sudo openssl req -new -key client-key.pem -out client.csr</span><br><span class="line">Enter pass phrase for client-key.pem:</span><br><span class="line">Can&#x27;t load /home/wei/.rnd into RNG</span><br><span class="line">140471898436800:error:2406F079:random number generator:RAND_load_file:Cannot open file:../crypto/rand/randfile.c:88:Filename=/home/wei/.rnd</span><br><span class="line">You are about to be asked to enter information that will be incorporated</span><br><span class="line">into your certificate request.</span><br><span class="line">What you are about to enter is what is called a Distinguished Name or a DN.</span><br><span class="line">There are quite a few fields but you can leave some blank</span><br><span class="line">For some fields there will be a default value,</span><br><span class="line">If you enter &#x27;.&#x27;, the field will be left blank.</span><br><span class="line">-----</span><br><span class="line">Country Name (2 letter code) [AU]:</span><br><span class="line">State or Province Name (full name) [Some-State]:</span><br><span class="line">Locality Name (eg, city) []:</span><br><span class="line">Organization Name (eg, company) [Internet Widgits Pty Ltd]:</span><br><span class="line">Organizational Unit Name (eg, section) []:</span><br><span class="line">Common Name (e.g. server FQDN or YOUR name) []:</span><br><span class="line">Email Address []:</span><br><span class="line"></span><br><span class="line">Please enter the following &#x27;extra&#x27; attributes</span><br><span class="line">to be sent with your certificate request</span><br><span class="line">A challenge password []:</span><br><span class="line">An optional company name []:</span><br></pre></td></tr></table></figure>
 <p>这里除了密码没有什么要注意的地方，也是客户端与服务端的第一点差别。</p>
 <p>第二点差别是，有时候需要在使用客户端的时候添加SSL的扩展属性，也就类似TSL/SSL这样的需求。<br>其实也很好办，这里给出一个简单的样例，先生成一个SSL扩展文件：</p>
-<div class="hljs"><pre><code class="hljs text">prexer $ echo extendedKeyUsage = clientAuth &gt; extfile.conf</code></pre></div>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">prexer $ echo extendedKeyUsage = clientAuth &gt; extfile.conf</span><br></pre></td></tr></table></figure>
 
 <p>来吧，都准备好了，那就进行签名授书喽：</p>
-<div class="hljs"><pre><code class="hljs text">prexer $ sudo openssl x509 -req -days 365 -in client.csr -CA ca.pem -CAkey ca-key.pem -out client-cert.pem -extfile extfile.conf
-Signature ok
-subject=C = AU, ST = Some-State, O = Internet Widgits Pty Ltd
-Getting CA Private Key
-Enter pass phrase for ca-key.pem:</code></pre></div>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">prexer $ sudo openssl x509 -req -days 365 -in client.csr -CA ca.pem -CAkey ca-key.pem -out client-cert.pem -extfile extfile.conf</span><br><span class="line">Signature ok</span><br><span class="line">subject=C = AU, ST = Some-State, O = Internet Widgits Pty Ltd</span><br><span class="line">Getting CA Private Key</span><br><span class="line">Enter pass phrase for ca-key.pem:</span><br></pre></td></tr></table></figure>
 
 <p>输入认证机构密钥密码后，客户端的证书也就授权完成了，一鼓作气，让我们把客户端密钥的密码删掉吧：</p>
-<div class="hljs"><pre><code class="hljs text">prexer $ sudo openssl rsa -in client-key.pem -out client-key.pem
-Enter pass phrase for client-key.pem:
-writing RSA key</code></pre></div>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">prexer $ sudo openssl rsa -in client-key.pem -out client-key.pem</span><br><span class="line">Enter pass phrase for client-key.pem:</span><br><span class="line">writing RSA key</span><br></pre></td></tr></table></figure>
 
 <p>好了，到了这里所有的内容都已经准备齐全了，他们应该是这样的：</p>
-<div class="hljs"><pre><code class="hljs text">prexer $ ls -l
-total 40
--rw------- 1 root root 1743 10月 30 23:06 ca-key.pem
--rw------- 1 root root 1318 10月 30 23:12 ca.pem
--rw-r--r-- 1 wei  wei     3 10月 30 23:53 ca.srl
--rw-r--r-- 1 root root 1176 10月 30 23:53 client-cert.pem
--rw-r--r-- 1 root root  956 10月 30 23:46 client.csr
--rw------- 1 root root 1679 10月 30 23:56 client-key.pem
--rw-r--r-- 1 wei  wei    30 10月 30 23:51 extfile.conf
--rw------- 1 root root 1151 10月 30 23:32 server-cert.pem
--rw-r--r-- 1 root root  972 10月 30 23:24 server.csr
--rw------- 1 root root 1675 10月 30 23:36 server-key.pem</code></pre></div>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">prexer $ ls -l</span><br><span class="line">total 40</span><br><span class="line">-rw------- 1 root root 1743 10月 30 23:06 ca-key.pem</span><br><span class="line">-rw------- 1 root root 1318 10月 30 23:12 ca.pem</span><br><span class="line">-rw-r--r-- 1 wei  wei     3 10月 30 23:53 ca.srl</span><br><span class="line">-rw-r--r-- 1 root root 1176 10月 30 23:53 client-cert.pem</span><br><span class="line">-rw-r--r-- 1 root root  956 10月 30 23:46 client.csr</span><br><span class="line">-rw------- 1 root root 1679 10月 30 23:56 client-key.pem</span><br><span class="line">-rw-r--r-- 1 wei  wei    30 10月 30 23:51 extfile.conf</span><br><span class="line">-rw------- 1 root root 1151 10月 30 23:32 server-cert.pem</span><br><span class="line">-rw-r--r-- 1 root root  972 10月 30 23:24 server.csr</span><br><span class="line">-rw------- 1 root root 1675 10月 30 23:36 server-key.pem</span><br></pre></td></tr></table></figure>
 
 <p>那么接下来的部分我们谈谈验证，毕竟你有了这些东东还要用不是？</p>
 <h2 id="如何验证授权的证书？"><a href="#如何验证授权的证书？" class="headerlink" title="如何验证授权的证书？"></a>如何验证授权的证书？</h2><p>现在，我们已经有了服务端和客户端的双向证书，那么就用下面的案例来验证：</p>
@@ -495,467 +279,91 @@ total 40
 </ul>
 <h3 id="搭建一个最简单的http服务器"><a href="#搭建一个最简单的http服务器" class="headerlink" title="搭建一个最简单的http服务器"></a>搭建一个最简单的http服务器</h3><p>利用python的内置模块搭建http服务器是一件很简单的事情，不过它是一个简易的http服务器，用来做验证和开发。</p>
 <p>我们创建一个目录，用来存放http服务的主页内容：</p>
-<div class="hljs"><pre><code class="hljs shell">prexer $ mkdir -p $PWD/CA_demo/http-home</code></pre></div>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">prexer $ mkdir -p $PWD/CA_demo/http-home</span><br></pre></td></tr></table></figure>
 
 <p>然后写一个简单的索引文件：</p>
-<div class="hljs"><pre><code class="hljs shell">prexer $ cat &gt; $PWD/CA_demo/http-home/index.html &lt;&lt;EOF
-&lt;!DOCTYPE html&gt;
-&lt;html lang=&quot;en&quot;&gt;
-&lt;head&gt;
-    &lt;meta charset=&quot;UTF-8&quot;&gt;
-    &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;
-    &lt;meta http-equiv=&quot;X-UA-Compatible&quot; content=&quot;ie=edge&quot;&gt;
-    &lt;title&gt;Document&lt;/title&gt;
-&lt;/head&gt;
-&lt;body&gt;
-    &lt;h3&gt;Python SimpleHTTPServer&lt;/h3&gt;
-    &lt;p style=&quot;margin-left: 30px; color: rebeccapurple&quot;&gt;Python 3 Web Server&lt;/p&gt; 
-&lt;/body&gt;
-&lt;/html&gt;
-EOF</code></pre></div>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">prexer $ cat &gt; $PWD/CA_demo/http-home/index.html &lt;&lt;EOF</span><br><span class="line">&lt;!DOCTYPE html&gt;</span><br><span class="line">&lt;html lang=&quot;en&quot;&gt;</span><br><span class="line">&lt;head&gt;</span><br><span class="line">    &lt;meta charset=&quot;UTF-8&quot;&gt;</span><br><span class="line">    &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;</span><br><span class="line">    &lt;meta http-equiv=&quot;X-UA-Compatible&quot; content=&quot;ie=edge&quot;&gt;</span><br><span class="line">    &lt;title&gt;Document&lt;/title&gt;</span><br><span class="line">&lt;/head&gt;</span><br><span class="line">&lt;body&gt;</span><br><span class="line">    &lt;h3&gt;Python SimpleHTTPServer&lt;/h3&gt;</span><br><span class="line">    &lt;p style=&quot;margin-left: 30px; color: rebeccapurple&quot;&gt;Python 3 Web Server&lt;/p&gt; </span><br><span class="line">&lt;/body&gt;</span><br><span class="line">&lt;/html&gt;</span><br><span class="line">EOF</span><br></pre></td></tr></table></figure>
 
 <p>最后只要到<code>http-home</code>目录启动python内置的http服务即可：</p>
-<div class="hljs"><pre><code class="hljs shell">prexer $ (cd $PWD/CA_demo/http-home/ &amp;&amp; python3 -m http.server 8008 &amp;)</code></pre></div>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">prexer $ (cd $PWD/CA_demo/http-home/ &amp;&amp; python3 -m http.server 8008 &amp;)</span><br></pre></td></tr></table></figure>
 
 <p>这里我们绑定了8008端口，后续在配置nginx会重定向到它，看到这里的括号了么，没错它是防止你的操作对<code>父SHELL</code>产生影响而已。</p>
 <p>为了模拟一个有用的设计，我们将本机的地址映射为想要的主机名，后续都用<code>prexer.home</code>来完成<code>localhost</code>或<code>127.0.0.1</code>的映射。<br>其实还可以搭建一个DNS服务来完成这件事，其实也很简单，本站已有相关的文章讲解DNS服务其的内网搭建，请使用本站搜索引擎来翻阅吧。</p>
 <p>完成映射：</p>
-<div class="hljs"><pre><code class="hljs shell">prexer $ sudo echo 127.0.0.1 prexer.home &gt;&gt; /etc/hosts</code></pre></div>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">prexer $ sudo echo 127.0.0.1 prexer.home &gt;&gt; /etc/hosts</span><br></pre></td></tr></table></figure>
 
-<p>现在你访问<code>http://prexer.home:8008</code>的界面应该是这样的(请保证你的8008端口没有被占用)：<br><img src="/img/blog-images/ca_http_index_show.png" srcset="/img/loading.gif" alt="理想的显示结果"></p>
+<p>现在你访问<code>http://prexer.home:8008</code>的界面应该是这样的(请保证你的8008端口没有被占用)：<br><img src="/img/blog-images/ca_http_index_show.png" alt="理想的显示结果"></p>
 <h3 id="构建一个Ngix反向代理服务"><a href="#构建一个Ngix反向代理服务" class="headerlink" title="构建一个Ngix反向代理服务"></a>构建一个Ngix反向代理服务</h3><p>使用docker构建一Nginx服务简直太简单了，如何安装docker请参考本站的其他文章，依旧直接使用本站的搜索引擎即可。</p>
 <p>接下来默认你已经拥有了docker环境，来一起搭建一个Nginx。</p>
 <p>不过在搭建之前还有一些要准备的工作，其实也很容易，就是一个nginx的配置文件:</p>
-<div class="hljs"><pre><code class="hljs shell">prexer $ mkdir -p $PWD/CA_demo/nginx-conf
-prexer $ cat &gt; $PWD/CA_demo/nginx-conf/default.conf &lt;&lt;EOF
-server &#123;
-    listen      8000;
-    server_name prexer.home;
-
-    listen   443 ssl;
-
-    ssl_certificate             /etc/nginx/CA/server-cert.pem;
-    ssl_certificate_key         /etc/nginx/CA/server-key.pem;
-    ssl_client_certificate      /etc/nginx/CA/ca.pem;
-    ssl_verify_client           on;
-
-    ssl_session_cache           shared:SSL:1m;
-    ssl_session_timeout         5m;
-    ssl_protocols               SSLv2 SSLv3 TLSv1.2;
-    ssl_ciphers                 HIGH:!aNULL:!MD5;
-    ssl_prefer_server_ciphers   on;
-
-    location / &#123;
-        proxy_pass http://localhost:8008/;
-    &#125;
-&#125;
-EOF</code></pre></div>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line">prexer $ mkdir -p $PWD/CA_demo/nginx-conf</span><br><span class="line">prexer $ cat &gt; $PWD/CA_demo/nginx-conf/default.conf &lt;&lt;EOF</span><br><span class="line">server &#123;</span><br><span class="line">    listen      8000;</span><br><span class="line">    server_name prexer.home;</span><br><span class="line"></span><br><span class="line">    listen   443 ssl;</span><br><span class="line"></span><br><span class="line">    ssl_certificate             /etc/nginx/CA/server-cert.pem;</span><br><span class="line">    ssl_certificate_key         /etc/nginx/CA/server-key.pem;</span><br><span class="line">    ssl_client_certificate      /etc/nginx/CA/ca.pem;</span><br><span class="line">    ssl_verify_client           on;</span><br><span class="line"></span><br><span class="line">    ssl_session_cache           shared:SSL:1m;</span><br><span class="line">    ssl_session_timeout         5m;</span><br><span class="line">    ssl_protocols               SSLv2 SSLv3 TLSv1.2;</span><br><span class="line">    ssl_ciphers                 HIGH:!aNULL:!MD5;</span><br><span class="line">    ssl_prefer_server_ciphers   on;</span><br><span class="line"></span><br><span class="line">    location / &#123;</span><br><span class="line">        proxy_pass http://localhost:8008/;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line">EOF</span><br></pre></td></tr></table></figure>
 
 <p>好了，开始构建nginx服务容器：</p>
-<div class="hljs"><pre><code class="hljs shell">prexer $ docker run -t --name ca_nginx -d \
-					--net=host \
-					--volume `pwd`/CA:/etc/nginx/CA \
-					--volume `pwd`/CA_demo/nginx-conf/default.conf:/etc/nginx/conf.d/default.conf \
-					--privileged=true \
-					nginx:latest</code></pre></div>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">prexer $ docker run -t --name ca_nginx -d \</span><br><span class="line">					--net=host \</span><br><span class="line">					--volume `pwd`/CA:/etc/nginx/CA \</span><br><span class="line">					--volume `pwd`/CA_demo/nginx-conf/default.conf:/etc/nginx/conf.d/default.conf \</span><br><span class="line">					--privileged=true \</span><br><span class="line">					nginx:latest</span><br></pre></td></tr></table></figure>
 
 <p>到了这里你的目录结构应该是这样才对：</p>
-<div class="hljs"><pre><code class="hljs shell">prexer $ tree CA_demo/ CA/
-CA_demo/
-├── https-home
-│   └── index.html
-└── nginx-conf
-    └── default.conf
-CA/
-├── ca-key.pem
-├── ca.pem
-├── ca.srl
-├── client-cert.pem
-├── client.csr
-├── client-key.pem
-├── extfile.conf
-├── server-cert.pem
-├── server.csr
-└── server-key.pem
-
-2 directories, 12 files</code></pre></div>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">prexer $ tree CA_demo/ CA/</span><br><span class="line">CA_demo/</span><br><span class="line">├── https-home</span><br><span class="line">│   └── index.html</span><br><span class="line">└── nginx-conf</span><br><span class="line">    └── default.conf</span><br><span class="line">CA/</span><br><span class="line">├── ca-key.pem</span><br><span class="line">├── ca.pem</span><br><span class="line">├── ca.srl</span><br><span class="line">├── client-cert.pem</span><br><span class="line">├── client.csr</span><br><span class="line">├── client-key.pem</span><br><span class="line">├── extfile.conf</span><br><span class="line">├── server-cert.pem</span><br><span class="line">├── server.csr</span><br><span class="line">└── server-key.pem</span><br><span class="line"></span><br><span class="line">2 directories, 12 files</span><br></pre></td></tr></table></figure>
 
 <p>查看docker容器的输出可以这样：<code>docker logs -f ca_nginx</code></p>
 <p>到这里nginx也搭建完成了，下面来验证。</p>
-<h3 id="通过浏览器来验证自建证书的有效性"><a href="#通过浏览器来验证自建证书的有效性" class="headerlink" title="通过浏览器来验证自建证书的有效性"></a>通过浏览器来验证自建证书的有效性</h3><p>首先，浏览器没有安装证书的时候，应该得到这样的结果：<br><img src="/img/blog-images/ca_no_cert.png" srcset="/img/loading.gif" alt="没有证书的时候"></p>
+<h3 id="通过浏览器来验证自建证书的有效性"><a href="#通过浏览器来验证自建证书的有效性" class="headerlink" title="通过浏览器来验证自建证书的有效性"></a>通过浏览器来验证自建证书的有效性</h3><p>首先，浏览器没有安装证书的时候，应该得到这样的结果：<br><img src="/img/blog-images/ca_no_cert.png" alt="没有证书的时候"></p>
 <p>很遗憾，浏览器并不能直接使用刚才我们制定的证书格式，它需要用一个转换后的格式，这里我们生成<code>.p12</code>文件，至于格式的知识请自行索引。</p>
-<div class="hljs"><pre><code class="hljs shell">prexer $ sudo openssl pkcs12 -export -in client-cert.pem -inkey client-key.pem -out client.p12 -name &quot;iot&quot;</code></pre></div>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">prexer $ sudo openssl pkcs12 -export -in client-cert.pem -inkey client-key.pem -out client.p12 -name &quot;iot&quot;</span><br></pre></td></tr></table></figure>
 <p>这里转换成另一种格式的证书时，需要输入密码，请记住它，后续要在浏览器中使用！</p>
-<p>好了现在我们有了<code>client.p12</code>文件，浏览器可以很好的支持它，你肯定已经记住了它的生成位置，现在通过浏览器添加证书：<br><img src="/img/blog-images/ca_import_cert_to_firefox.png" srcset="/img/loading.gif" alt="导入证书步骤"></p>
-<p>添加完成后再次访问<code>https://prexer.home</code>，应该是这样：<br><img src="/img/blog-images/ca_cert_imported.png" srcset="/img/loading.gif" alt="添加证书后"></p>
+<p>好了现在我们有了<code>client.p12</code>文件，浏览器可以很好的支持它，你肯定已经记住了它的生成位置，现在通过浏览器添加证书：<br><img src="/img/blog-images/ca_import_cert_to_firefox.png" alt="导入证书步骤"></p>
+<p>添加完成后再次访问<code>https://prexer.home</code>，应该是这样：<br><img src="/img/blog-images/ca_cert_imported.png" alt="添加证书后"></p>
 <p>到了这里所有相关证书的生成和验证流程就讲解完成了，真心希望对你有帮助呢 ^_^</p>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta">文章作者: </span><span class="post-copyright-info"><a href="mailto:undefined">prexer</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta">文章链接: </span><span class="post-copyright-info"><a href="http://example.com/2020/10/30/ca-certificate-authentication-md/">http://example.com/2020/10/30/ca-certificate-authentication-md/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta">版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来自 <a href="http://example.com" target="_blank">妖灵山</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/CA/">CA</a><a class="post-meta__tags" href="/tags/%E8%AF%81%E4%B9%A6/">证书</a><a class="post-meta__tags" href="/tags/%E9%89%B4%E6%9D%83/">鉴权</a></div><div class="post_share"><div class="social-share" data-image="/images/blog-images/ca_logo.png" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/social-share.js/dist/css/share.min.css"><script src="https://cdn.jsdelivr.net/npm/social-share.js/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><div class="prev-post pull-left"><a href="/2020/11/03/terraform-azure-demo-doc/"><img class="prev-cover" src="/images/blog-images/terraform_logo.png" onerror="onerror=null;src='/img/404.jpg'" alt="cover of previous post"><div class="pagination-info"><div class="label">上一篇</div><div class="prev_info">Terraform Azure Demo开源项目的官方文档</div></div></a></div><div class="next-post pull-right"><a href="/2020/10/29/docker/internal_dns_server_setup/"><img class="next-cover" src="/images/blog-images/dns_setup.png" onerror="onerror=null;src='/img/404.jpg'" alt="cover of next post"><div class="pagination-info"><div class="label">下一篇</div><div class="next_info">在内网快速利用docker搭建DNS服务器</div></div></a></div></nav><hr/><div id="post-comment"><div class="comment-head"><div class="comment-headline"><i class="fas fa-comments fa-fw"></i><span> 评论</span></div></div><div class="comment-wrap"><div><div class="vcomment" id="vcomment"></div></div></div></div></div><div class="aside_content" id="aside_content"><div class="card-widget card-info"><div class="card-content"><div class="card-info-avatar is-center"><img class="avatar-img" src="/images/site/header.jpg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/><div class="author-info__name">prexer</div><div class="author-info__description">Email-To-Me: prexer@163.com</div></div><div class="card-info-data"><div class="card-info-data-item is-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">5</div></a></div><div class="card-info-data-item is-center"><a href="/tags/"><div class="headline">标签</div><div class="length-num">15</div></a></div><div class="card-info-data-item is-center"><a href="/categories/"><div class="headline">分类</div><div class="length-num">7</div></a></div></div><a class="button--animated" id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/prexerx"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons is-center"><a class="social-icon" href="https://gitee.com/prexer" target="_blank" title="Gitee"><i class="fab fa-git-square"></i></a><a class="social-icon" href="https://github.com/prexerx" target="_blank" title="Github"><i class="fab fa-github"></i></a><a class="social-icon" href="mailto:prexer@163.com" target="_blank" title="Email"><i class="fas fa-envelope"></i></a></div></div></div><div class="card-widget card-announcement"><div class="card-content"><div class="item-headline"><i class="fas fa-bullhorn card-announcement-animation"></i><span>公告</span></div><div class="announcement_content">欢迎来到`妖灵山`读文章，如果我们能帮到你，那确实是一件令人开心的事！</div></div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="card-content"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%8F%AF%E5%A4%8D%E7%8E%B0%E7%9A%84%E7%B3%BB%E7%BB%9F%E7%8E%AF%E5%A2%83"><span class="toc-number">1.</span> <span class="toc-text">可复现的系统环境</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#CA%E8%AF%81%E4%B9%A6%E6%B6%89%E5%8F%8A%E7%9A%84%E5%AF%B9%E8%B1%A1%E6%9C%89%E5%93%AA%E4%BA%9B%EF%BC%9F"><span class="toc-number">2.</span> <span class="toc-text">CA证书涉及的对象有哪些？</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%BB%BA%E7%AB%8B%E4%B8%80%E4%B8%AA%E8%AF%81%E4%B9%A6%E6%8E%88%E6%9D%83%E4%B8%AD%E5%BF%83%E7%8E%A9%E7%8E%A9"><span class="toc-number">3.</span> <span class="toc-text">建立一个证书授权中心玩玩</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%A2%81%E5%8F%91%E8%AE%A4%E8%AF%81%E6%9C%BA%E6%9E%84%E7%9A%84%E8%AF%81%E4%B9%A6"><span class="toc-number">4.</span> <span class="toc-text">颁发认证机构的证书</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%88%9B%E5%BB%BA%E7%94%A8%E4%BA%8E%E6%9C%8D%E5%8A%A1%E7%AB%AF%E7%9A%84%E8%AF%81%E4%B9%A6%E7%AD%BE%E5%90%8D%E8%AF%B7%E6%B1%82%E5%92%8C%E5%AF%86%E9%92%A5"><span class="toc-number">5.</span> <span class="toc-text">创建用于服务端的证书签名请求和密钥</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%AD%A3%E5%BC%8F%E7%94%9F%E6%88%90%E6%9C%8D%E5%8A%A1%E7%AB%AF%E7%9A%84%E8%AF%81%E4%B9%A6"><span class="toc-number">6.</span> <span class="toc-text">正式生成服务端的证书</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%88%9B%E5%BB%BA%E5%AE%A2%E6%88%B7%E7%AB%AF%E7%9A%84%E5%AF%86%E9%92%A5%E5%92%8C%E8%AF%81%E4%B9%A6"><span class="toc-number">7.</span> <span class="toc-text">创建客户端的密钥和证书</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%A6%82%E4%BD%95%E9%AA%8C%E8%AF%81%E6%8E%88%E6%9D%83%E7%9A%84%E8%AF%81%E4%B9%A6%EF%BC%9F"><span class="toc-number">8.</span> <span class="toc-text">如何验证授权的证书？</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%90%AD%E5%BB%BA%E4%B8%80%E4%B8%AA%E6%9C%80%E7%AE%80%E5%8D%95%E7%9A%84http%E6%9C%8D%E5%8A%A1%E5%99%A8"><span class="toc-number">8.1.</span> <span class="toc-text">搭建一个最简单的http服务器</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%9E%84%E5%BB%BA%E4%B8%80%E4%B8%AANgix%E5%8F%8D%E5%90%91%E4%BB%A3%E7%90%86%E6%9C%8D%E5%8A%A1"><span class="toc-number">8.2.</span> <span class="toc-text">构建一个Ngix反向代理服务</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E9%80%9A%E8%BF%87%E6%B5%8F%E8%A7%88%E5%99%A8%E6%9D%A5%E9%AA%8C%E8%AF%81%E8%87%AA%E5%BB%BA%E8%AF%81%E4%B9%A6%E7%9A%84%E6%9C%89%E6%95%88%E6%80%A7"><span class="toc-number">8.3.</span> <span class="toc-text">通过浏览器来验证自建证书的有效性</span></a></li></ol></li></ol></div></div></div><div class="card-widget card-recent-post"><div class="card-content"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item"><a class="thumbnail" href="/2020/11/03/terraform-azure-demo-doc/" title="Terraform Azure Demo开源项目的官方文档"><img src="/images/blog-images/terraform_logo.png" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="Terraform Azure Demo开源项目的官方文档"/></a><div class="content"><a class="title" href="/2020/11/03/terraform-azure-demo-doc/" title="Terraform Azure Demo开源项目的官方文档">Terraform Azure Demo开源项目的官方文档</a><time datetime="2020-11-03T01:45:37.000Z" title="发表于 2020-11-03 01:45:37">2020-11-03</time></div></div><div class="aside-list-item"><a class="thumbnail" href="/2020/10/30/ca-certificate-authentication-md/" title="你想通过本地构建CA来颁发证书么？"><img src="/images/blog-images/ca_logo.png" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="你想通过本地构建CA来颁发证书么？"/></a><div class="content"><a class="title" href="/2020/10/30/ca-certificate-authentication-md/" title="你想通过本地构建CA来颁发证书么？">你想通过本地构建CA来颁发证书么？</a><time datetime="2020-10-30T09:01:12.000Z" title="发表于 2020-10-30 09:01:12">2020-10-30</time></div></div><div class="aside-list-item"><a class="thumbnail" href="/2020/10/29/docker/internal_dns_server_setup/" title="在内网快速利用docker搭建DNS服务器"><img src="/images/blog-images/dns_setup.png" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="在内网快速利用docker搭建DNS服务器"/></a><div class="content"><a class="title" href="/2020/10/29/docker/internal_dns_server_setup/" title="在内网快速利用docker搭建DNS服务器">在内网快速利用docker搭建DNS服务器</a><time datetime="2020-10-29T07:05:35.000Z" title="发表于 2020-10-29 07:05:35">2020-10-29</time></div></div><div class="aside-list-item"><a class="thumbnail" href="/2020/10/24/base/git_speed_up_downloading/" title="推荐一个加速git仓库下载的方法"><img src="/images/site/dead-cells-04.jpeg" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="推荐一个加速git仓库下载的方法"/></a><div class="content"><a class="title" href="/2020/10/24/base/git_speed_up_downloading/" title="推荐一个加速git仓库下载的方法">推荐一个加速git仓库下载的方法</a><time datetime="2020-10-24T04:42:57.000Z" title="发表于 2020-10-24 04:42:57">2020-10-24</time></div></div><div class="aside-list-item"><a class="thumbnail" href="/2020/02/20/articles_writing_rules/" title="文章编写规范"><img src="/images/site/dead-cells-03.jpeg" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="文章编写规范"/></a><div class="content"><a class="title" href="/2020/02/20/articles_writing_rules/" title="文章编写规范">文章编写规范</a><time datetime="2020-02-20T20:02:20.000Z" title="发表于 2020-02-20 20:02:20">2020-02-20</time></div></div></div></div></div></div></div></main><footer id="footer" style="background-image: url(/images/site/index_home_top.jpg)"><div id="footer-wrap"><div class="copyright">&copy;2020 By prexer</div><div class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly</a></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="浅色和深色模式转换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside_config" type="button" title="设置"><i class="fas fa-cog"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><a id="to_comment" href="#post-comment" title="直达评论"><i class="fas fa-comments"></i></a><button id="go-up" type="button" title="回到顶部"><i class="fas fa-arrow-up"></i></button></div></div><div id="local-search"><div class="search-dialog"><div class="search-dialog__title" id="local-search-title">本地搜索</div><div id="local-input-panel"><div id="local-search-input"><div class="local-search-box"><input class="local-search-box--input" placeholder="搜索文章" type="text"/></div></div></div><hr/><div id="local-search-results"></div><span class="search-close-button"><i class="fas fa-times"></i></span></div><div id="search-mask"></div></div><div><script src="/js/utils.js"></script><script src="/js/main.js"></script><script src="https://cdn.jsdelivr.net/npm/node-snackbar/dist/snackbar.min.js"></script><script src="/js/search/local-search.js"></script><script>var preloader = {
+  endLoading: () => {
+    document.body.style.overflow = 'auto';
+    document.getElementById('loading-box').classList.add("loaded")
+  },
+  initLoading: () => {
+    document.body.style.overflow = '';
+    document.getElementById('loading-box').classList.remove("loaded")
 
-            </div>
-            <hr>
-            <div>
-              <div class="post-metas mb-3">
-                
-                  <div class="post-meta mr-3">
-                    <i class="iconfont icon-category"></i>
-                    
-                      <a class="hover-with-bg" href="/categories/CA/">CA</a>
-                    
-                  </div>
-                
-                
-                  <div class="post-meta">
-                    <i class="iconfont icon-tags"></i>
-                    
-                      <a class="hover-with-bg" href="/tags/CA/">CA</a>
-                    
-                      <a class="hover-with-bg" href="/tags/%E8%AF%81%E4%B9%A6/">证书</a>
-                    
-                      <a class="hover-with-bg" href="/tags/%E9%89%B4%E6%9D%83/">鉴权</a>
-                    
-                  </div>
-                
-              </div>
-              
-                <p class="note note-warning">本站所有文章除特别声明外，均采用 <a target="_blank" href="https://creativecommons.org/licenses/by-sa/4.0/deed.zh" rel="nofollow noopener noopener">CC BY-SA 4.0 协议</a> ，转载请注明出处！</p>
-              
-              
-                <div class="post-prevnext row">
-                  <article class="post-prev col-6">
-                    
-                    
-                  </article>
-                  <article class="post-next col-6">
-                    
-                    
-                      <a href="/2020/10/29/docker/internal_dns_server_setup/">
-                        <span class="hidden-mobile">在内网快速利用docker搭建DNS服务器</span>
-                        <span class="visible-mobile">下一篇</span>
-                        <i class="iconfont icon-arrowright"></i>
-                      </a>
-                    
-                  </article>
-                </div>
-              
-            </div>
-
-            
-              <!-- Comments -->
-              <article class="comments" id="comments">
-                
-                
-  <div id="vcomments"></div>
-  <script type="text/javascript">
-    function loadValine() {
-      addScript('https://cdn.staticfile.org/valine/1.4.14/Valine.min.js', function () {
-        new Valine({
-          el: "#vcomments",
-          app_id: "qsamq3Y5DtW17GTEo8fUTR1q-gzGzoHsz",
-          app_key: "U3LxIC5Qmh7XJxc7oi8JWoJ2",
-          placeholder: "请评论和本文有关的技术内容，在发声之前也请你带上你的灵魂...",
-          path: window.location.pathname,
-          avatar: "retro",
-          meta: ["nick","mail","link"],
-          pageSize: "10",
-          lang: "zh-CN",
-          highlight: false,
-          recordIP: true,
-          serverURLs: "https://qsamq3y5.lc-cn-n1-shared.com",
-        });
-      });
+  }
+}
+window.addEventListener('load',()=> {preloader.endLoading()})</script><div class="js-pjax"><script>function loadValine () {
+  function initValine () {
+    let initData = {
+      el: '#vcomment',
+      appId: 'qsamq3Y5DtW17GTEo8fUTR1q-gzGzoHsz',
+      appKey: 'U3LxIC5Qmh7XJxc7oi8JWoJ2',
+      placeholder: '评论之前，请带上你的灵魂，谈论和本文有关的内容，如果是闲聊或者吐槽，请到留言板...',
+      avatar: 'monsterid',
+      meta: 'nick,mail,link'.split(','),
+      pageSize: '10',
+      lang: 'zh-CN',
+      recordIP: false,
+      serverURLs: 'https://qsamq3y5.lc-cn-n1-shared.com',
+      emojiCDN: '',
+      emojiMaps: "",
+      enableQQ: false,
+      path: window.location.pathname,
     }
-    waitElementVisible('vcomments', loadValine);
-  </script>
-  <noscript>Please enable JavaScript to view the <a target="_blank" href="https://valine.js.org" rel="nofollow noopener noopener">comments
-      powered by Valine.</a></noscript>
 
-
-              </article>
-            
-          </article>
-        </div>
-      </div>
-    </div>
-    
-      <div class="d-none d-lg-block col-lg-2 toc-container" id="toc-ctn">
-        <div id="toc">
-  <p class="toc-header"><i class="iconfont icon-list"></i>&nbsp;目录</p>
-  <div id="tocbot"></div>
-</div>
-
-      </div>
-    
-  </div>
-</div>
-
-<!-- Custom -->
-
-
-    
-  </main>
-
-  
-    <a id="scroll-top-button" href="#" role="button">
-      <i class="iconfont icon-arrowup" aria-hidden="true"></i>
-    </a>
-  
-
-  
-    <div class="modal fade" id="modalSearch" tabindex="-1" role="dialog" aria-labelledby="ModalLabel"
-     aria-hidden="true">
-  <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
-    <div class="modal-content">
-      <div class="modal-header text-center">
-        <h4 class="modal-title w-100 font-weight-bold">搜索</h4>
-        <button type="button" id="local-search-close" class="close" data-dismiss="modal" aria-label="Close">
-          <span aria-hidden="true">&times;</span>
-        </button>
-      </div>
-      <div class="modal-body mx-3">
-        <div class="md-form mb-5">
-          <input type="text" id="local-search-input" class="form-control validate">
-          <label data-error="x" data-success="v"
-                 for="local-search-input">关键词</label>
-        </div>
-        <div class="list-group" id="local-search-result"></div>
-      </div>
-    </div>
-  </div>
-</div>
-  
-
-  
-
-  
-
-  <footer class="mt-5">
-  <div class="text-center py-3">
-    <div>
-      <a href="https://hexo.io" target="_blank" rel="nofollow noopener"><span>Hexo</span></a>
-      <i class="iconfont icon-love"></i>
-      <a href="https://github.com/fluid-dev/hexo-theme-fluid" target="_blank" rel="nofollow noopener">
-        <span>Fluid</span></a>
-    </div>
-    
-  <div class="statistics">
-    
-    
-
-    
-      
-        <!-- 不蒜子统计PV -->
-        <span id="busuanzi_container_site_pv" style="display: none">
-            总访问量 
-            <span id="busuanzi_value_site_pv"></span>
-             次
-          </span>
-      
-      
-        <!-- 不蒜子统计UV -->
-        <span id="busuanzi_container_site_uv" style="display: none">
-            总访客数 
-            <span id="busuanzi_value_site_uv"></span>
-             人
-          </span>
-      
-    
-  </div>
-
-
-    
-
-    
-  </div>
-</footer>
-
-<!-- SCRIPTS -->
-<script  src="https://cdn.staticfile.org/jquery/3.4.1/jquery.min.js" ></script>
-<script  src="https://cdn.staticfile.org/twitter-bootstrap/4.4.1/js/bootstrap.min.js" ></script>
-<script  src="/js/debouncer.js" ></script>
-<script  src="/js/main.js" ></script>
-
-<!-- Plugins -->
-
-
-  
-    <script  src="/js/lazyload.js" ></script>
-  
-
-
-
-  
-
-
-
-  <script defer src="https://cdn.staticfile.org/clipboard.js/2.0.6/clipboard.min.js" ></script>
-  <script  src="/js/clipboard-use.js" ></script>
-
-
-
-  <script defer src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" ></script>
-
-
-
-
-
-  <script  src="https://cdn.staticfile.org/tocbot/4.11.1/tocbot.min.js" ></script>
-  <script>
-    $(document).ready(function () {
-      var boardCtn = $('#board-ctn');
-      var boardTop = boardCtn.offset().top;
-
-      tocbot.init({
-        tocSelector: '#tocbot',
-        contentSelector: '#post-body',
-        headingSelector: 'h1,h2,h3,h4,h5,h6',
-        linkClass: 'tocbot-link',
-        activeLinkClass: 'tocbot-active-link',
-        listClass: 'tocbot-list',
-        isCollapsedClass: 'tocbot-is-collapsed',
-        collapsibleClass: 'tocbot-is-collapsible',
-        collapseDepth: 6,
-        scrollSmooth: true,
-        headingsOffset: -boardTop
-      });
-      if ($('.toc-list-item').length > 0) {
-        $('#toc').css('visibility', 'visible');
-      }
-    });
-  </script>
-
-
-
-  <script  src="https://cdn.staticfile.org/typed.js/2.0.11/typed.min.js" ></script>
-  <script>
-    var typed = new Typed('#subtitle', {
-      strings: [
-        '  ',
-        "你想通过本地构建CA来颁发证书么？&nbsp;",
-      ],
-      cursorChar: "_",
-      typeSpeed: 70,
-      loop: false,
-    });
-    typed.stop();
-    $(document).ready(function () {
-      $(".typed-cursor").addClass("h2");
-      typed.start();
-    });
-  </script>
-
-
-
-  <script  src="https://cdn.staticfile.org/anchor-js/4.2.2/anchor.min.js" ></script>
-  <script>
-    anchors.options = {
-      placement: "right",
-      visible: "hover",
-      
-    };
-    var el = "h1,h2,h3,h4,h5,h6".split(",");
-    var res = [];
-    for (item of el) {
-      res.push(".markdown-body > " + item)
+    if (true) { 
+      initData.requiredFields= ('nick,mail'.split(','))
     }
-    anchors.add(res.join(", "))
-  </script>
-
-
-
-  <script  src="/js/local-search.js" ></script>
-  <script>
-    var path = "/local-search.xml";
-    var inputArea = document.querySelector("#local-search-input");
-    inputArea.onclick = function () {
-      searchFunc(path, 'local-search-input', 'local-search-result');
-      this.onclick = null
+    
+    if (false) {
+      const otherData = false
+      initData = Object.assign({}, initData, otherData)
     }
-  </script>
+    
+    const valine = new Valine(initData)
+  }
 
+  if (typeof Valine === 'function') initValine() 
+  else getScript('https://cdn.jsdelivr.net/npm/valine/dist/Valine.min.js').then(initValine)
+}
 
-
-  <script  src="https://cdn.staticfile.org/fancybox/3.5.7/jquery.fancybox.min.js" ></script>
-  <link  rel="stylesheet" href="https://cdn.staticfile.org/fancybox/3.5.7/jquery.fancybox.min.css" />
-
-  <script>
-    $('#post img:not(.no-zoom img, img[no-zoom]), img[zoom]').each(
-      function () {
-        var element = document.createElement('a');
-        $(element).attr('data-fancybox', 'images');
-        $(element).attr('href', $(this).attr('src'));
-        $(this).wrap(element);
-      }
-    );
-  </script>
-
-
-
-
-
-
-
-  
-  
-    <script>
-      !function (e, t, a) {
-        function r() {
-          for (var e = 0; e < s.length; e++) s[e].alpha <= 0 ? (t.body.removeChild(s[e].el), s.splice(e, 1)) : (s[e].y--, s[e].scale += .004, s[e].alpha -= .013, s[e].el.style.cssText = "left:" + s[e].x + "px;top:" + s[e].y + "px;opacity:" + s[e].alpha + ";transform:scale(" + s[e].scale + "," + s[e].scale + ") rotate(45deg);background:" + s[e].color + ";z-index:99999");
-          requestAnimationFrame(r)
-        }
-
-        function n() {
-          var t = "function" == typeof e.onclick && e.onclick;
-          e.onclick = function (e) {
-            t && t(), o(e)
-          }
-        }
-
-        function o(e) {
-          var a = t.createElement("div");
-          a.className = "heart", s.push({
-            el: a,
-            x: e.clientX - 5,
-            y: e.clientY - 5,
-            scale: 1,
-            alpha: 1,
-            color: c()
-          }), t.body.appendChild(a)
-        }
-
-        function i(e) {
-          var a = t.createElement("style");
-          a.type = "text/css";
-          try {
-            a.appendChild(t.createTextNode(e))
-          } catch (t) {
-            a.styleSheet.cssText = e
-          }
-          t.getElementsByTagName("head")[0].appendChild(a)
-        }
-
-        function c() {
-          return "rgb(" + ~~(255 * Math.random()) + "," + ~~(255 * Math.random()) + "," + ~~(255 * Math.random()) + ")"
-        }
-
-        var s = [];
-        e.requestAnimationFrame = e.requestAnimationFrame || e.webkitRequestAnimationFrame || e.mozRequestAnimationFrame || e.oRequestAnimationFrame || e.msRequestAnimationFrame || function (e) {
-          setTimeout(e, 1e3 / 60)
-        }, i(".heart{width: 10px;height: 10px;position: fixed;background: #f00;transform: rotate(45deg);-webkit-transform: rotate(45deg);-moz-transform: rotate(45deg);}.heart:after,.heart:before{content: '';width: inherit;height: inherit;background: inherit;border-radius: 50%;-webkit-border-radius: 50%;-moz-border-radius: 50%;position: fixed;}.heart:after{top: -5px;}.heart:before{left: -5px;}"), n(), r()
-      }(window, document);
-    </script>
-  
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-</body>
-</html>
+if ('Valine' === 'Valine' || !true) {
+  if (true) btf.loadComment(document.querySelector('#vcomment'),loadValine)
+  else setTimeout(() => loadValine(), 0)
+} else {
+  function loadOtherComment () {
+    loadValine()
+  }
+}</script><script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div><script defer="defer" id="ribbon" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1/dist/canvas-ribbon.min.js" size="150" alpha="0.6" zIndex="-1" mobile="false" data-click="false"></script></div></body></html>
